@@ -6,6 +6,7 @@
 	import GoalList from '#lib/GoalList.svelte';
 	import HabitGrid from '#lib/HabitGrid.svelte';
 	import InsightCards from '#lib/InsightCards.svelte';
+	import PullToRefresh from '#lib/PullToRefresh.svelte';
 
 	// Everything comes from GET /api/week. n8n keeps it up to date; days can
 	// also be corrected here.
@@ -93,6 +94,8 @@
 		return () => document.removeEventListener('visibilitychange', onVisible);
 	});
 </script>
+
+<PullToRefresh onrefresh={load} />
 
 <main>
 	<div class="band band-top" style:--band-h={bandH} bind:offsetHeight={topH}>
