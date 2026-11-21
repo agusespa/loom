@@ -15,6 +15,11 @@
 	let latestStart = $state<string | null>(null); // this week's Monday, from the server
 	let banner = $state<'offline' | 'expired' | { status: number } | null>(null);
 	let loading = $state(true);
+	// The band is two pieces: the header (sticky) and the insight cards (scroll away). One gradient
+	// is sized across both so they read as a single band.
+	let topH = $state(0);
+	let restH = $state(0);
+	const bandH = $derived(topH + restH ? `${topH + restH}px` : null);
 
 	// SvelteKit's build version is the build's timestamp; it tells two builds of one release apart.
 	const builtMs = Number(version);
@@ -90,7 +95,7 @@
 </script>
 
 <main>
-	<div class="band">
+	<div class="band band-top" style:--band-h={bandH} bind:offsetHeight={topH}>
 		<header class="top">
 			<button class="nav" id="prev" aria-label="Previous week" disabled={!week} onclick={() => go(-1)}
 				>‹</button
@@ -125,10 +130,12 @@
 				>›</button
 			>
 		</header>
-		{#if week}
-			<InsightCards insights={week.insights} />
-		{/if}
 	</div>
+	{#if week}
+		<div class="band band-rest" style:--band-h={bandH} bind:offsetHeight={restH}>
+			<InsightCards insights={week.insights} />
+		</div>
+	{/if}
 
 	{#if banner}
 		<div class="banner" role="status">
@@ -144,17 +151,17 @@
 
 	{#if week}
 		<section>
-			<div class="sec"><span>Habits</span><span class="muted">Tap a day to edit</span></div>
+			<div class="sec"><span>Habits</span></div>
 			<HabitGrid habits={week.habits} today={week.today} {isCurrent} onedit={edit} />
 		</section>
 
 		<section>
-			<div class="sec"><span>Short-term goals</span><span class="muted">From Notion</span></div>
+			<div class="sec"><span>Short-term goals</span></div>
 			<GoalList goals={week.goals.short_term} today={week.today} />
 		</section>
 
 		<section>
-			<div class="sec"><span>Perennial goals</span><span class="muted">From Notion</span></div>
+			<div class="sec"><span>Perennial goals</span></div>
 			<GoalList goals={week.goals.perennial} today={week.today} />
 		</section>
 	{/if}

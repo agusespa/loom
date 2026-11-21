@@ -116,13 +116,37 @@ h1 {
 	font-variant-numeric: tabular-nums;
 }
 
-/* The colored header band; it runs under the status bar. */
+/*
+ * The colored header band; it runs under the status bar. The header part stays pinned at the top
+ * while the insight cards under it scroll away; --band-h (set from the page) stretches one gradient
+ * over both parts.
+ */
 .band {
-	background: var(--band);
+	background: var(--band) no-repeat;
+	background-size: 100% var(--band-h, 100%);
 	color: #fff;
 	/* Full bleed: out to the screen edges, content still lined up with the page column. */
-	margin: calc(-1 * (env(safe-area-inset-top) + 1.6rem)) calc(50% - 50vw) 0;
-	padding: calc(env(safe-area-inset-top) + 1.6rem) calc(50vw - 50%) 16px;
+	margin: 0 calc(50% - 50vw);
+	padding: 0 calc(50vw - 50%) 16px;
+}
+.band-top {
+	position: sticky;
+	top: 0;
+	z-index: 15;
+	margin-top: calc(-1 * (env(safe-area-inset-top) + 1.6rem));
+	padding-top: calc(env(safe-area-inset-top) + 1.6rem);
+	background-position: top;
+}
+/* Some of the gap above the cards stays with the header, so it has room below it when pinned. */
+.band-top:has(+ .band-rest) {
+	padding-bottom: 10px;
+}
+.band-rest .cards {
+	margin-top: 6px;
+}
+.band-rest {
+	display: flow-root; /* keeps the cards' top margin inside, on the gradient */
+	background-position: bottom;
 }
 .band .muted {
 	color: rgba(255, 255, 255, 0.82);
