@@ -9,3 +9,7 @@ on:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+
+  e2e:
+    needs: verify
+    uses: ./.github/workflows/e2e.yml

@@ -1,4 +1,4 @@
-// Command icons draws the app icons into internal/ui/static.
+// Command icons draws the app icons into web/static.
 // Run with `make icons`; the PNGs are committed.
 package main
 
@@ -67,7 +67,7 @@ func clamp(v, lo, hi float64) float64 {
 }
 
 func main() {
-	dir := filepath.Join("internal", "ui", "static")
+	dir := filepath.Join("web", "static")
 	for name, size := range map[string]int{"icon-192.png": 192, "icon-512.png": 512, "apple-touch-icon.png": 180} {
 		f, err := os.Create(filepath.Join(dir, name))
 		if err != nil {

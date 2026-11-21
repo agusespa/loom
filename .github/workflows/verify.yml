@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  verify:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,10 +14,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
 
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1
@@ -42,8 +38,31 @@ jobs:
           version: latest
           install-mode: "goinstall"
 
-      - name: Run tests
-        run: make test
+      - name: Run Go tests
+        run: go test -race ./...
 
       - name: Verify Go build
         run: go build -o /dev/null ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run check
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Unit tests
+        run: npm test --if-present
+      - run: npm run build

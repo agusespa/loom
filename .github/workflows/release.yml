@@ -17,8 +17,12 @@ jobs:
   verify:
     uses: ./.github/workflows/verify.yml
 
-  publish:
+  e2e:
     needs: verify
+    uses: ./.github/workflows/e2e.yml
+
+  publish:
+    needs: [verify, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,5 +58,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

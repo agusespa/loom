@@ -28,7 +28,11 @@ func newServer(t *testing.T, now string) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	static := fstest.MapFS{"index.html": {Data: []byte("<html>loom</html>")}}
+	static := fstest.MapFS{
+		"index.html":            {Data: []byte("<html>loom</html>")},
+		"_app/immutable/app.js": {Data: []byte("app")},
+		"service-worker.js":     {Data: []byte("sw")},
+	}
 	return New(s, static, Clock{Loc: loc, DayStart: 5 * time.Hour, Now: func() time.Time { return at }})
 }
 
@@ -131,7 +135,19 @@ func TestStatic(t *testing.T) {
 	if rec := do(t, h, "GET", "/", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "loom") {
 		t.Fatalf("index: %d", rec.Code)
 	}
-	if rec := do(t, h, "GET", "/missing.js", ""); rec.Code != 404 {
-		t.Fatalf("missing: %d", rec.Code)
+	// Unknown paths get the SPA shell, so client routes work on reload.
+	if rec := do(t, h, "GET", "/somewhere", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "loom") {
+		t.Fatalf("fallback: %d", rec.Code)
+	}
+	rec := do(t, h, "GET", "/_app/immutable/app.js", "")
+	if rec.Code != 200 || !strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("immutable: %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	rec = do(t, h, "GET", "/service-worker.js", "")
+	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("service worker: %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	if rec := do(t, h, "POST", "/", ""); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("post: %d", rec.Code)
 	}
 }

@@ -10,18 +10,20 @@ Notion goal databases    ─▶ n8n ─▶ PUT /api/goals/...  ─┘
 ```
 
 - Go server (`cmd/loom`) with SQLite (`modernc.org/sqlite`, no cgo), shipped as a distroless image.
-- Plain HTML/CSS/JS frontend in `internal/ui/static`, embedded in the binary. There's no build step.
+- SvelteKit frontend in `web/` (static adapter, a single-page app), built and embedded in the binary from `internal/ui/dist`.
 - No login of its own. From outside, it's reachable only through Cloudflare Access. n8n calls it over the Docker network.
 
 ## Run locally
 
 ```bash
-make run     # :8080, database in data/loom.db
+make dev     # Go API on :8080 plus Vite on :5173 with hot reload; open :5173
 make seed    # sample data for this week, in another terminal
-make test
+make run     # production build on :8080, database in data/loom.db
+make test    # Go tests
+make e2e     # Playwright against a fresh database
+make verify  # everything CI runs
+make hooks   # once: runs verify and e2e before every push
 ```
-
-Frontend edits need a server restart because the files are embedded.
 
 ## Data model
 
@@ -66,4 +68,4 @@ Use an **HTTP Request** node against `http://loom:8080`:
 
 ## Release
 
-Push a `v*` tag to build `ghcr.io/agusespa/loom` for amd64 and arm64 (`:X.Y.Z`, `:X.Y`, `:latest`). The image runs as distroless `nonroot` (uid 65532), so the data directory must be owned by that user.
+Push a `v*` tag to build `ghcr.io/agusespa/loom` for amd64 and arm64 (`:X.Y.Z`, `:X.Y`, `:latest`). The version shows in the footer. The image runs as distroless `nonroot` (uid 65532), so the data directory must be owned by that user.

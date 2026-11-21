@@ -1,7 +1,14 @@
 .git
 .github
 .claude
+node_modules
+web/node_modules
+web/build
+web/.svelte-kit
+internal/ui/dist/*
+!internal/ui/dist/.gitkeep
+e2e
+test-results
+playwright-report
 bin
 data
-scripts
-coverage.out

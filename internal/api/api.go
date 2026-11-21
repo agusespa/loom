@@ -36,7 +36,7 @@ func (c Clock) Today() time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-// New returns the HTTP handler. static is the frontend.
+// New returns the HTTP handler. static is the built frontend (may be empty).
 //
 // The app has no login of its own. From outside it is reached only through
 // Cloudflare Access; n8n calls it over the Docker network. Requests that
@@ -233,24 +233,34 @@ func jsonError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// staticHandler serves the frontend. The service worker and the page itself
-// must revalidate so a new release reaches the phone on its next open.
+// staticHandler serves the SPA: existing files as-is, everything else index.html.
 func staticHandler(static fs.FS) http.Handler {
 	files := http.FileServerFS(static)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if name == "" {
-			name = "index.html"
-		}
-		if _, err := fs.Stat(static, name); err != nil {
-			http.NotFound(w, r)
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Cache-Control", "no-cache")
-		if name == "sw.js" {
-			w.Header().Set("Service-Worker-Allowed", "/")
+		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if p != "" {
+			if st, err := fs.Stat(static, p); err == nil && !st.IsDir() {
+				if strings.HasPrefix(p, "_app/immutable/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				} else {
+					w.Header().Set("Cache-Control", "no-cache")
+				}
+				files.ServeHTTP(w, r)
+				return
+			}
 		}
-		files.ServeHTTP(w, r)
+		index, err := fs.ReadFile(static, "index.html")
+		if err != nil {
+			http.Error(w, "frontend not built", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write(index)
 	})
 }
