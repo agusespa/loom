@@ -21,7 +21,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm --prefix web ci && npm --prefix web run build
+      - run: npm --prefix web ci # test:e2e builds the frontend itself
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
 

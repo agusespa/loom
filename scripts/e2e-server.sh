@@ -1,6 +1,6 @@
 #!/bin/sh
 # Starts the production server for Playwright with a fresh database.
-# Expects the frontend to be built already (web/build), as CI does.
+# Expects the frontend to be built already (web/build): npm run test:e2e builds it first.
 set -e
 cd "$(dirname "$0")/.."
 

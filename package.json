@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test:e2e": "playwright test"
+		"test:e2e": "npm --prefix web run build && playwright test"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.65.1"
