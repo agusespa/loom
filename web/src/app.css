@@ -24,6 +24,11 @@
 	--thread-3: #12b886;
 	--thread-4: #e08a00;
 	--radius: 12px;
+	/*
+	 * Space between the status bar and the header. In the home-screen app iOS blurs a strip just under
+	 * the status bar that can't be turned off, so the week line has to start below it.
+	 */
+	--top-gap: 2rem;
 	/* See-through glass for the toast, as in Gympass. */
 	--glass: rgba(255, 255, 255, 0.62);
 	--glass-filter: saturate(200%) blur(28px);
@@ -82,11 +87,8 @@ body {
 main {
 	max-width: 480px;
 	margin: 0 auto;
-	/*
-	 * 1.6rem below the status bar, as in Gympass: in the home-screen app iOS draws a soft blur just
-	 * under the status bar, which catches the week and date line at 1rem.
-	 */
-	padding: calc(env(safe-area-inset-top) + 1.6rem) 18px calc(env(safe-area-inset-bottom) + 24px);
+	/* --top-gap keeps the header clear of the iOS status bar blur. */
+	padding: calc(env(safe-area-inset-top) + var(--top-gap)) 18px calc(env(safe-area-inset-bottom) + 24px);
 }
 
 h1 {
@@ -128,8 +130,8 @@ h1 {
 	position: sticky;
 	top: 0;
 	z-index: 15;
-	margin-top: calc(-1 * (env(safe-area-inset-top) + 1.6rem));
-	padding-top: calc(env(safe-area-inset-top) + 1.6rem);
+	margin-top: calc(-1 * (env(safe-area-inset-top) + var(--top-gap)));
+	padding-top: calc(env(safe-area-inset-top) + var(--top-gap));
 	background-position: top;
 }
 /* Some of the gap above the cards stays with the header, so it has room below it when pinned. */
