@@ -1,6 +1,6 @@
-# Loom
+<p align="center"> <img src="web/static/icon-192.png" alt="Loom icon: five coloured threads merging into one" width="128"> </p>
 
-<img src="web/static/icon.svg" alt="Loom icon: five coloured threads merging into one" width="96" height="96">
+# Loom
 
 A life dashboard you install on your phone as a PWA: this week's habits, how they compare with last week, and your goals.
 

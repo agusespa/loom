@@ -1,5 +1,10 @@
-// Command icons draws the app icons into web/static.
+// Command icons derives the app's PNG icons from the square master,
+// web/static/icon-maskable-512.png (a full-bleed render of icon.svg).
 // Run with `make icons`; the PNGs are committed.
+//
+//   - icon-192.png, icon-512.png: rounded corners on a transparent
+//     background, for the manifest's "any" purpose and the README.
+//   - apple-touch-icon.png: opaque square, since iOS rounds it itself.
 package main
 
 import (
@@ -7,77 +12,97 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 )
 
-var (
-	bg    = color.RGBA{0x0f, 0x6e, 0x56, 0xff}
-	solid = color.RGBA{0xff, 0xff, 0xff, 0xff}
-	faint = color.RGBA{0x5d, 0xca, 0xa5, 0xff}
-)
+// Corner radius as a share of the side, matching rx="230" in icon.svg.
+const cornerRatio = 230.0 / 1024.0
 
-// A 3x3 habit grid, the same pattern as icon.svg: 1 = done, 0 = not.
-var pattern = [3][3]int{{1, 1, 0}, {1, 0, 1}, {1, 1, 1}}
+func main() {
+	dir := filepath.Join("web", "static")
+	master := load(filepath.Join(dir, "icon-maskable-512.png"))
 
-func draw(size int) *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	for y := range size {
-		for x := range size {
-			img.Set(x, y, bg)
-		}
+	for name, size := range map[string]int{"icon-192.png": 192, "icon-512.png": 512} {
+		save(filepath.Join(dir, name), round(resize(master, size)))
 	}
-	// Content sits in the middle 60% so maskable crops never cut it.
-	cell := float64(size) * 0.16
-	gap := float64(size) * 0.06
-	origin := (float64(size) - (3*cell + 2*gap)) / 2
-	radius := cell * 0.22
-	for r := range 3 {
-		for c := range 3 {
-			col := faint
-			if pattern[r][c] == 1 {
-				col = solid
-			}
-			x0 := origin + float64(c)*(cell+gap)
-			y0 := origin + float64(r)*(cell+gap)
-			roundRect(img, x0, y0, cell, radius, col)
-		}
+	save(filepath.Join(dir, "apple-touch-icon.png"), resize(master, 180))
+}
+
+func load(path string) image.Image {
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	img, err := png.Decode(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		log.Fatal(err)
 	}
 	return img
 }
 
-func roundRect(img *image.RGBA, x0, y0, side, r float64, col color.RGBA) {
-	for y := int(y0); y < int(y0+side+1); y++ {
-		for x := int(x0); x < int(x0+side+1); x++ {
+func save(path string, img image.Image) {
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		log.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// resize scales src to size x size by averaging the source area under
+// each output pixel.
+func resize(src image.Image, size int) *image.NRGBA {
+	b := src.Bounds()
+	scale := float64(b.Dx()) / float64(size)
+	out := image.NewNRGBA(image.Rect(0, 0, size, size))
+	for y := range size {
+		for x := range size {
+			x0, x1 := float64(x)*scale, float64(x+1)*scale
+			y0, y1 := float64(y)*scale, float64(y+1)*scale
+			var r, g, bl, a, w float64
+			for sy := int(y0); sy < int(math.Ceil(y1)); sy++ {
+				wy := math.Min(y1, float64(sy+1)) - math.Max(y0, float64(sy))
+				for sx := int(x0); sx < int(math.Ceil(x1)); sx++ {
+					wx := math.Min(x1, float64(sx+1)) - math.Max(x0, float64(sx))
+					c := color.NRGBAModel.Convert(src.At(b.Min.X+sx, b.Min.Y+sy)).(color.NRGBA)
+					k := wx * wy
+					r += float64(c.R) * k
+					g += float64(c.G) * k
+					bl += float64(c.B) * k
+					a += float64(c.A) * k
+					w += k
+				}
+			}
+			out.SetNRGBA(x, y, color.NRGBA{uint8(r/w + 0.5), uint8(g/w + 0.5), uint8(bl/w + 0.5), uint8(a/w + 0.5)})
+		}
+	}
+	return out
+}
+
+// round makes the corners transparent, antialiasing the edge.
+func round(img *image.NRGBA) *image.NRGBA {
+	size := float64(img.Bounds().Dx())
+	r := size * cornerRatio
+	for y := range img.Bounds().Dy() {
+		for x := range img.Bounds().Dx() {
 			px, py := float64(x)+0.5, float64(y)+0.5
-			if px < x0 || py < y0 || px > x0+side || py > y0+side {
-				continue
-			}
-			cx := clamp(px, x0+r, x0+side-r)
-			cy := clamp(py, y0+r, y0+side-r)
-			if (px-cx)*(px-cx)+(py-cy)*(py-cy) <= r*r {
-				img.Set(x, y, col)
-			}
+			cx := math.Max(r, math.Min(px, size-r))
+			cy := math.Max(r, math.Min(py, size-r))
+			d := math.Hypot(px-cx, py-cy)
+			cover := math.Max(0, math.Min(1, r-d+0.5))
+			c := img.NRGBAAt(x, y)
+			c.A = uint8(float64(c.A)*cover + 0.5)
+			img.SetNRGBA(x, y, c)
 		}
 	}
-}
-
-func clamp(v, lo, hi float64) float64 {
-	return max(lo, min(v, hi))
-}
-
-func main() {
-	dir := filepath.Join("web", "static")
-	for name, size := range map[string]int{"icon-192.png": 192, "icon-512.png": 512, "apple-touch-icon.png": 180} {
-		f, err := os.Create(filepath.Join(dir, name))
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := png.Encode(f, draw(size)); err != nil {
-			log.Fatal(err)
-		}
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}
+	return img
 }
