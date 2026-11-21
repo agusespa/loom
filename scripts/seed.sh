@@ -19,15 +19,24 @@ offset() {
   date -v"${sign}${n}d" +%F 2>/dev/null || date -d "$n days" +%F
 }
 
-put "/api/days/$(offset 0)/workout" '{"status":"done","note":"Upper-body"}'
+put "/api/days/$(offset 0)/workout" '{"status":"done"}'
 put "/api/days/$(offset 2)/workout" '{"status":"missed"}'
-put "/api/days/$(offset 4)/workout" '{"status":"done","note":"Lower-body"}'
+put "/api/days/$(offset 4)/workout" '{"status":"done"}'
 put "/api/days/$(offset 6)/workout" '{"status":"planned"}'
 put "/api/days/$(offset 1)/dance" '{"status":"done"}'
 put "/api/days/$(offset 5)/dance" '{"status":"planned"}'
-for i in 0 1 3 4; do put "/api/days/$(offset $i)/meditation" '{"status":"done","value":12}'; done
-put "/api/days/$(offset 2)/meditation" '{"value":4}'
 for i in 0 2 3; do put "/api/days/$(offset $i)/writing" '{"status":"done"}'; done
+put "/api/days/$(offset 4)/writing" '{"status":"done"}'
+# Earlier weeks, for the trend and the last 30 days.
+for w in 2 3 4 5 6 7; do
+  b=$(( -7 * w ))
+  put "/api/days/$(offset $b)/workout" '{"status":"done"}'
+  if (( w % 3 == 0 )); then s=missed; else s=done; fi
+  put "/api/days/$(offset $(( b + 2 )))/workout" "{\"status\":\"$s\"}"
+  if (( w % 2 == 0 )); then s=done; else s=missed; fi
+  put "/api/days/$(offset $(( b + 3 )))/dance" "{\"status\":\"$s\"}"
+  put "/api/days/$(offset $(( b + 1 )))/writing" '{"status":"done"}'
+done
 # Last week, for the comparison.
 put "/api/days/$(offset -7)/workout" '{"status":"done"}'
 put "/api/days/$(offset -5)/workout" '{"status":"missed"}'

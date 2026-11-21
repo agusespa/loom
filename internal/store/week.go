@@ -10,12 +10,11 @@ import (
 type HabitWeek struct {
 	Habit
 	Days []Day `json:"days"`
-	Done int   `json:"done"`
 }
 
 // Summary counts the week. Adherence is done / (done + missed) over the
-// plannable habits, so habits that are never planned can't inflate it; it
-// is nil until something planned has been done or missed.
+// plannable habits that aren't archived, so habits that are never planned
+// can't inflate it; it is nil until something planned has been done or missed.
 type Summary struct {
 	Done      int      `json:"done"`
 	Missed    int      `json:"missed"`
@@ -33,15 +32,24 @@ type Week struct {
 		ShortTerm []Goal `json:"short_term"`
 		Perennial []Goal `json:"perennial"`
 	} `json:"goals"`
-	// UpdatedAt is the latest write from n8n (ms), so the app can say how fresh it is.
+	Insights Insights `json:"insights"`
+	// UpdatedAt is the latest write (ms), so the app can say how fresh it is.
 	UpdatedAt *int64 `json:"updated_at"`
 }
 
-// Week returns the 7 days starting at monday.
-func (s *Store) Week(ctx context.Context, monday time.Time) (*Week, error) {
-	habits, err := s.Habits(ctx)
+// Week returns the 7 days starting at monday. today is the current tracker
+// day, which the insights count up to.
+func (s *Store) Week(ctx context.Context, monday, today time.Time) (*Week, error) {
+	all, err := s.Habits(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// Archived habits are left out of everything the dashboard shows.
+	habits := make([]Habit, 0, len(all))
+	for _, h := range all {
+		if !h.Archived {
+			habits = append(habits, h)
+		}
 	}
 	start := monday.Format(time.DateOnly)
 	end := monday.AddDate(0, 0, 6).Format(time.DateOnly)
@@ -58,7 +66,7 @@ func (s *Store) Week(ctx context.Context, monday time.Time) (*Week, error) {
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT date, habit, status, value, note FROM habit_days WHERE date BETWEEN ? AND ?", start, end)
+		"SELECT date, habit, status, source FROM habit_days WHERE date BETWEEN ? AND ?", start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +74,7 @@ func (s *Store) Week(ctx context.Context, monday time.Time) (*Week, error) {
 	for rows.Next() {
 		var d Day
 		var habit string
-		if err := rows.Scan(&d.Date, &habit, &d.Status, &d.Value, &d.Note); err != nil {
+		if err := rows.Scan(&d.Date, &habit, &d.Status, &d.Source); err != nil {
 			return nil, err
 		}
 		i, ok := index[habit]
@@ -82,9 +90,6 @@ func (s *Store) Week(ctx context.Context, monday time.Time) (*Week, error) {
 			continue
 		}
 		w.Habits[i].Days[slot] = d
-		if d.Status != nil && *d.Status == StatusDone {
-			w.Habits[i].Done++
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -93,11 +98,10 @@ func (s *Store) Week(ctx context.Context, monday time.Time) (*Week, error) {
 	if w.Summary, err = s.summary(ctx, start, end); err != nil {
 		return nil, err
 	}
-	prev, err := s.summary(ctx, monday.AddDate(0, 0, -7).Format(time.DateOnly), monday.AddDate(0, 0, -1).Format(time.DateOnly))
-	if err != nil {
+	if w.Insights, err = s.insights(ctx, habits, monday, today); err != nil {
 		return nil, err
 	}
-	w.PrevAdherence = prev.Adherence
+	w.PrevAdherence = w.Insights.Trend[TrendWeeks-2] // the trend ends with this week
 
 	if w.Goals.ShortTerm, err = s.Goals(ctx, ListShortTerm); err != nil {
 		return nil, err
@@ -126,7 +130,7 @@ func (s *Store) summary(ctx context.Context, start, end string) (Summary, error)
 			count(*) FILTER (WHERE d.status = 'missed'),
 			count(*) FILTER (WHERE d.status = 'planned')
 		FROM habit_days d JOIN habits h ON h.key = d.habit
-		WHERE h.plannable AND d.date BETWEEN ? AND ?`, start, end).Scan(&sum.Done, &sum.Missed, &sum.Planned)
+		WHERE h.plannable AND NOT h.archived AND d.date BETWEEN ? AND ?`, start, end).Scan(&sum.Done, &sum.Missed, &sum.Planned)
 	if err != nil {
 		return sum, err
 	}

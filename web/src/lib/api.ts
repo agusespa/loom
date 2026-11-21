@@ -5,8 +5,8 @@ export type Status = 'planned' | 'done' | 'missed';
 export interface Day {
 	date: string;
 	status: Status | null;
-	value: number | null;
-	note: string | null;
+	/** Who set the status: a correction in the app or an n8n automation. */
+	source: 'app' | 'n8n' | null;
 }
 
 export interface HabitWeek {
@@ -15,7 +15,6 @@ export interface HabitWeek {
 	position: number;
 	plannable: boolean;
 	days: Day[];
-	done: number;
 }
 
 export interface Summary {
@@ -37,6 +36,25 @@ export interface Goal {
 	url: string;
 }
 
+export interface Streak {
+	habit: string;
+	name: string;
+	count: number;
+	unit: 'sessions' | 'days';
+}
+
+export interface Insights {
+	as_of: string;
+	streak: Streak | null;
+	/** Adherence of the last 8 weeks, oldest first (the last is this week); null = nothing resolved. */
+	trend: (number | null)[];
+	last_30: {
+		from: string;
+		to: string;
+		habits: { key: string; name: string; plannable: boolean; done: number }[];
+	};
+}
+
 export interface Week {
 	start: string;
 	end: string;
@@ -45,24 +63,53 @@ export interface Week {
 	summary: Summary;
 	prev_adherence: number | null;
 	goals: { short_term: Goal[]; perennial: Goal[] };
+	insights: Insights;
 	updated_at: number | null;
 }
 
-export type WeekResult =
-	{ kind: 'ok'; week: Week } | { kind: 'offline' } | { kind: 'expired' } | { kind: 'error'; status: number };
+/** Why a request didn't go through: no connection, or the Cloudflare Access session expired. */
+type Failure = { kind: 'offline' } | { kind: 'expired' };
 
-/** Load a week (its Monday, or null for the current one). */
-export async function fetchWeek(start: string | null): Promise<WeekResult> {
-	const url = '/api/week' + (start ? `?start=${start}` : '');
+/**
+ * fetch for the API. redirect is manual: an expired Access session answers with a redirect to
+ * the login page, which fetch can't follow cross-origin.
+ */
+async function request(url: string, init?: RequestInit): Promise<Response | Failure> {
 	let res: Response;
 	try {
-		// manual: an expired Cloudflare Access session answers with a redirect
-		// to the login page, which fetch can't follow cross-origin.
-		res = await fetch(url, { redirect: 'manual', credentials: 'same-origin' });
+		res = await fetch(url, { ...init, redirect: 'manual', credentials: 'same-origin' });
 	} catch {
 		return { kind: 'offline' };
 	}
-	if (res.type === 'opaqueredirect' || res.status === 401 || res.status === 403) return { kind: 'expired' };
+	// A 403 from Loom itself is a refused cross-origin write, not an expired session.
+	const accessRefused = res.status === 403 && !init?.method;
+	if (res.type === 'opaqueredirect' || res.status === 401 || accessRefused) return { kind: 'expired' };
+	return res;
+}
+
+export type WeekResult = { kind: 'ok'; week: Week } | Failure | { kind: 'error'; status: number };
+
+/** Load a week (its Monday, or null for the current one). */
+export async function fetchWeek(start: string | null): Promise<WeekResult> {
+	const res = await request('/api/week' + (start ? `?start=${start}` : ''));
+	if (!(res instanceof Response)) return res;
 	if (!res.ok) return { kind: 'error', status: res.status };
 	return { kind: 'ok', week: await res.json() };
+}
+
+export type SaveResult = { kind: 'ok' } | Failure | { kind: 'error'; message: string };
+
+/** Set one habit's status for one day; null clears it. */
+export async function putDay(habit: string, date: string, status: Status | null): Promise<SaveResult> {
+	const res = await request(`/api/days/${date}/${habit}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ status })
+	});
+	if (!(res instanceof Response)) return res;
+	if (!res.ok) {
+		const body = await res.json().catch(() => null);
+		return { kind: 'error', message: body?.error ?? `HTTP ${res.status}` };
+	}
+	return { kind: 'ok' };
 }

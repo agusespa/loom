@@ -1,5 +1,5 @@
-// Package api serves the n8n write API, the week endpoint the app reads and
-// the embedded frontend.
+// Package api serves the write API (n8n and the app), the week endpoint the
+// app reads and the embedded frontend.
 package api
 
 import (
@@ -39,7 +39,8 @@ func (c Clock) Today() time.Time {
 // New returns the HTTP handler. static is the built frontend (may be empty).
 //
 // The app has no login of its own. From outside it is reached only through
-// Cloudflare Access; n8n calls it over the Docker network. Requests that
+// Cloudflare Access, which is what protects edits made in the app; n8n calls
+// it over the Docker network. Requests that
 // change data are refused when a browser marks them as coming from another
 // site, so a page you visit can't use your Access session to edit data.
 func New(s *store.Store, static fs.FS, clock Clock) http.Handler {
@@ -47,6 +48,7 @@ func New(s *store.Store, static fs.FS, clock Clock) http.Handler {
 	mux.Handle("GET /api/week", weekHandler(s, clock))
 	mux.Handle("GET /api/habits", habitsHandler(s))
 	mux.Handle("PUT /api/habits/{key}", putHabitHandler(s))
+	mux.Handle("GET /api/days", daysHandler(s))
 	mux.Handle("PUT /api/days/{date}/{habit}", putDayHandler(s))
 	mux.Handle("DELETE /api/days/{date}/{habit}", deleteDayHandler(s))
 	mux.Handle("GET /api/goals/{list}", goalsHandler(s))
@@ -91,7 +93,7 @@ func weekHandler(s *store.Store, clock Clock) http.HandlerFunc {
 		} else {
 			monday = today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
 		}
-		week, err := s.Week(r.Context(), monday)
+		week, err := s.Week(r.Context(), monday, today)
 		if err != nil {
 			serverError(w, err)
 			return
@@ -114,7 +116,7 @@ func habitsHandler(s *store.Store) http.HandlerFunc {
 	}
 }
 
-// PUT /api/habits/{key} {"name": "Workout", "position": 1, "plannable": true}
+// PUT /api/habits/{key} {"name": "Workout", "position": 1, "plannable": true, "archived": false}
 func putHabitHandler(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var h store.Habit
@@ -130,30 +132,74 @@ func putHabitHandler(s *store.Store) http.HandlerFunc {
 	}
 }
 
-// PUT /api/days/{date}/{habit} {"status": "done", "value": 12, "note": "Upper-body"}
-func putDayHandler(s *store.Store) http.HandlerFunc {
+// source tells corrections made in the PWA from n8n's writes. Browsers mark
+// every fetch with Sec-Fetch-Site, and requests from outside come through
+// Cloudflare Access, which adds the signed-in user; n8n's calls over the
+// Docker network carry neither.
+func source(r *http.Request) string {
+	if r.Header.Get("Sec-Fetch-Site") != "" || r.Header.Get("Cf-Access-Authenticated-User-Email") != "" {
+		return store.SourceApp
+	}
+	return store.SourceN8n
+}
+
+// GET /api/days?status=planned&before=YYYY-MM-DD lists logged days, oldest first.
+func daysHandler(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var d store.Day
-		if !decode(w, r, &d) {
-			return
-		}
-		d.Date = r.PathValue("date")
-		if err := s.PutDay(r.Context(), r.PathValue("habit"), d); err != nil {
+		q := r.URL.Query()
+		days, err := s.Days(r.Context(), q.Get("status"), q.Get("before"))
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, d)
+		writeJSON(w, http.StatusOK, map[string]any{"days": days})
 	}
 }
 
-func deleteDayHandler(s *store.Store) http.HandlerFunc {
+// dayResult answers writes to a day. Applied is false when an ?if= condition
+// didn't hold; Status is then the day's unchanged status.
+type dayResult struct {
+	Date    string  `json:"date"`
+	Habit   string  `json:"habit"`
+	Status  *string `json:"status"`
+	Applied bool    `json:"applied"`
+}
+
+// PUT /api/days/{date}/{habit}[?if=blank,planned] {"status": "done"}
+// A null status clears the day. With ?if= the write only happens when the
+// day's current status is one of those listed (blank meaning none).
+func putDayHandler(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := s.DeleteDay(r.Context(), r.PathValue("habit"), r.PathValue("date")); err != nil {
-			writeStoreError(w, err)
+		var body struct {
+			Status *string `json:"status"`
+		}
+		if !decode(w, r, &body) {
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		d := store.Day{Date: r.PathValue("date"), Status: body.Status}
+		var onlyIf []string
+		if q := r.URL.Query().Get("if"); q != "" {
+			onlyIf = strings.Split(q, ",")
+		}
+		writeDay(w, r, s, d, onlyIf)
 	}
+}
+
+// DELETE /api/days/{date}/{habit} clears the day, like PUT with a null status.
+func deleteDayHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeDay(w, r, s, store.Day{Date: r.PathValue("date")}, nil)
+	}
+}
+
+func writeDay(w http.ResponseWriter, r *http.Request, s *store.Store, d store.Day, onlyIf []string) {
+	habit := r.PathValue("habit")
+	applied, current, err := s.PutDay(r.Context(), habit, d, source(r), onlyIf...)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, dayResult{Date: d.Date, Habit: habit, Status: current, Applied: applied})
 }
 
 func goalsHandler(s *store.Store) http.HandlerFunc {

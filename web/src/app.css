@@ -1,38 +1,71 @@
 :root {
 	color-scheme: light dark;
-	--bg: #f6f5f1;
+	--bg: #fbfaf7;
 	--surface: #ffffff;
-	--tint: #eceae3;
-	--text: #1f1e1c;
-	--muted: #6f6d66;
-	--faint: #a9a79f;
-	--border: rgba(0, 0, 0, 0.1);
-	--done-bg: #e3f1d8;
-	--done: #3b6d11;
-	--missed-bg: #fbe4e4;
-	--missed: #a32d2d;
-	--planned: #ba7517;
-	--accent: #185fa5;
-	--bar: #1d9e75;
+	--tint: #f1efe9;
+	--text: #1d1c1a;
+	--muted: #6c6a64;
+	--faint: #aeaca5;
+	--border: rgba(0, 0, 0, 0.08);
+	/* The header band: violet to pink, a livelier take on the icon's indigo. */
+	--band: linear-gradient(120deg, #6d5dfc, #ff5c8a);
+	--done: #12b886;
+	--done-fg: #ffffff; /* the check on a filled done cell */
+	--missed-bg: #ffe5e2;
+	--missed: #d93f35;
+	--planned: #e08a00;
+	--accent: #1d1c1a;
+	--accent-fg: #ffffff;
+	--bar: #12b886;
+	/* The score's grade, on its pill. */
+	--pill: rgba(255, 255, 255, 0.95);
+	--good: #0f9d6b;
+	--ok: #c77700;
+	--bad: #d93f35;
+	/* One thread color per habit, by position. */
+	--thread-0: #ff5a4e;
+	--thread-1: #8b5cf6;
+	--thread-2: #1e88e5;
+	--thread-3: #12b886;
+	--thread-4: #e08a00;
 	--radius: 12px;
+	/* See-through glass for the toast, as in Gympass. */
+	--glass: rgba(255, 255, 255, 0.62);
+	--glass-filter: saturate(200%) blur(28px);
+	--glass-edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+	--glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #1a1a19;
-		--surface: #242422;
-		--tint: #2e2e2b;
-		--text: #ecebe6;
-		--muted: #a3a199;
-		--faint: #6a6862;
-		--border: rgba(255, 255, 255, 0.1);
-		--done-bg: #27410f;
-		--done: #b6dc8a;
-		--missed-bg: #4c1d1d;
-		--missed: #f2a3a3;
-		--planned: #f0b25c;
-		--accent: #85b7eb;
-		--bar: #5dcaa5;
+		--bg: #121214;
+		--surface: #1c1c20;
+		--tint: #26262b;
+		--text: #f4f4f2;
+		--muted: #a3a3ab;
+		--faint: #64646c;
+		--border: rgba(255, 255, 255, 0.08);
+		--band: linear-gradient(120deg, #5b4bf0, #f0457a);
+		--done: #38d9a9;
+		--done-fg: #141416;
+		--missed-bg: rgba(255, 107, 107, 0.16);
+		--missed: #ff8a80;
+		--planned: #ffc145;
+		--accent: #f4f4f2;
+		--accent-fg: #121214;
+		--bar: #38d9a9;
+		--pill: rgba(18, 18, 20, 0.55);
+		--good: #2bd69a;
+		--ok: #ffc145;
+		--bad: #ff8a80;
+		--thread-0: #ff7a6e;
+		--thread-1: #a78bfa;
+		--thread-2: #4dabf7;
+		--thread-3: #38d9a9;
+		--thread-4: #ffc145;
+		--glass: rgba(28, 28, 32, 0.58);
+		--glass-edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
+		--glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
 	}
 }
 
@@ -42,6 +75,7 @@
 
 body {
 	margin: 0;
+	overflow-x: clip; /* the full-bleed band is 100vw wide, scrollbar included */
 	background: var(--bg);
 	color: var(--text);
 	font:
@@ -57,7 +91,11 @@ body {
 main {
 	max-width: 480px;
 	margin: 0 auto;
-	padding: calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 24px);
+	/*
+	 * 1.6rem below the status bar, as in Gympass: in the home-screen app iOS draws a soft blur just
+	 * under the status bar, which catches the week and date line at 1rem.
+	 */
+	padding: calc(env(safe-area-inset-top) + 1.6rem) 18px calc(env(safe-area-inset-bottom) + 24px);
 }
 
 h1 {
@@ -78,6 +116,38 @@ h1 {
 	font-variant-numeric: tabular-nums;
 }
 
+/* The colored header band; it runs under the status bar. */
+.band {
+	background: var(--band);
+	color: #fff;
+	/* Full bleed: out to the screen edges, content still lined up with the page column. */
+	margin: calc(-1 * (env(safe-area-inset-top) + 1.6rem)) calc(50% - 50vw) 0;
+	padding: calc(env(safe-area-inset-top) + 1.6rem) calc(50vw - 50%) 16px;
+}
+.band .muted {
+	color: rgba(255, 255, 255, 0.82);
+}
+.band .nav {
+	color: rgba(255, 255, 255, 0.8);
+}
+.band .card {
+	background: rgba(255, 255, 255, 0.18);
+}
+.band .card .v span,
+.band .card .sub {
+	color: rgba(255, 255, 255, 0.82);
+}
+.band .spark polyline {
+	stroke: #fff;
+}
+.band .spark circle,
+.band .spark .now {
+	fill: #fff;
+}
+.band .spark .mid {
+	stroke: rgba(255, 255, 255, 0.5);
+}
+
 .top {
 	display: flex;
 	align-items: center;
@@ -90,11 +160,26 @@ h1 {
 .score {
 	text-align: right;
 }
+/* Adherence at a glance: graded colors on a pill, so they read on the band. */
+.score .big.good,
+.score .big.ok,
+.score .big.bad {
+	display: inline-block;
+	background: var(--pill);
+	padding: 0 9px;
+	border-radius: 10px;
+}
 .score .big.good {
-	color: var(--done);
+	color: var(--good);
+}
+.score .big.ok {
+	color: var(--ok);
 }
 .score .big.bad {
-	color: var(--missed);
+	color: var(--bad);
+}
+.score .muted {
+	margin-top: 3px;
 }
 
 .nav {
@@ -154,6 +239,40 @@ h1 {
 	font-weight: 400;
 	color: var(--muted);
 }
+.card .v .unit {
+	margin-left: 3px;
+}
+.card .sub {
+	font-size: 11px;
+	color: var(--muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.spark {
+	display: block;
+	margin-top: 2px;
+	overflow: visible;
+}
+.spark polyline {
+	fill: none;
+	stroke: var(--bar);
+	stroke-width: 1.5;
+	stroke-linejoin: round;
+	stroke-linecap: round;
+}
+.spark circle {
+	fill: var(--bar);
+}
+.spark .now {
+	fill: var(--text);
+}
+.spark .mid {
+	stroke: var(--faint);
+	stroke-width: 0.5;
+	stroke-dasharray: 2 2;
+	opacity: 0.6;
+}
 
 .sec {
 	display: flex;
@@ -189,10 +308,18 @@ h1 {
 	text-align: center;
 }
 .row.head .today-l {
-	color: var(--accent);
+	justify-self: center;
+	width: 20px;
+	height: 20px;
+	line-height: 20px;
+	border-radius: 50%;
+	background: var(--accent);
+	color: var(--accent-fg);
 	font-weight: 600;
 }
 .name {
+	color: var(--hc, inherit);
+	font-weight: 500;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -212,9 +339,10 @@ h1 {
 	color: var(--faint);
 	cursor: pointer;
 }
+/* Done is filled with the habit's thread color (--hc, set per row). */
 .d.done {
-	background: var(--done-bg);
-	color: var(--done);
+	background: var(--hc, var(--done));
+	color: var(--done-fg);
 }
 .d.missed {
 	background: var(--missed-bg);
@@ -222,6 +350,7 @@ h1 {
 }
 .d.planned {
 	border: 1.5px dashed var(--planned);
+	color: var(--planned);
 }
 .d.empty::after {
 	content: '';
@@ -234,18 +363,100 @@ h1 {
 .d.future.empty::after {
 	opacity: 0.2;
 }
-.d.today {
-	outline: 1.5px solid var(--accent);
-	outline-offset: 2px;
+.d.today.empty {
+	background: var(--tint);
+}
+.d.today.empty::after {
+	opacity: 0.9;
 }
 .d.sel {
 	box-shadow: 0 0 0 2px var(--text);
 }
 
-.detail {
-	min-height: 1.4em;
-	margin-top: 8px;
-	text-align: center;
+.grid-wrap {
+	position: relative;
+}
+.menu {
+	position: absolute;
+	z-index: 10;
+	background: var(--surface);
+	border: 0.5px solid var(--border);
+	border-radius: 12px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+	padding: 4px;
+	animation: menu-in 0.12s ease-out;
+}
+@keyframes menu-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+.menu-head {
+	font-size: 11px;
+	color: var(--muted);
+	padding: 6px 10px 4px;
+}
+.menu-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	border: 0;
+	background: none;
+	color: var(--text);
+	font: inherit;
+	font-size: 14px;
+	text-align: left;
+	padding: 8px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+	background: var(--tint);
+	outline: none;
+}
+.menu-item:disabled {
+	opacity: 0.5;
+}
+.menu-item .check {
+	margin-left: auto;
+	color: var(--muted);
+	font-size: 12px;
+}
+.swatch {
+	width: 18px;
+	height: 18px;
+	border-radius: 5px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	flex: none;
+}
+.swatch.done {
+	background: var(--hc, var(--done));
+	color: var(--done-fg);
+}
+.swatch.missed {
+	background: var(--missed-bg);
+	color: var(--missed);
+}
+.swatch.planned {
+	border: 1.5px dashed var(--planned);
+	color: var(--planned);
+}
+.swatch.empty {
+	border: 1px solid var(--border);
+}
+.menu-note {
+	font-size: 12px;
+	color: var(--muted);
+	padding: 6px 10px 8px;
+}
+.err {
+	color: var(--missed);
 }
 
 .goal {
@@ -315,4 +526,13 @@ h1 {
 footer {
 	text-align: center;
 	margin-top: 28px;
+}
+footer p {
+	margin: 0;
+}
+footer .version {
+	margin-top: 12px;
+	font-size: 11px;
+	line-height: 1.6;
+	font-variant-numeric: tabular-nums;
 }
