@@ -84,7 +84,9 @@
 		if (adherence === null) return planned ? `${planned} planned` : 'Week ahead';
 		if (adherence >= 0.85) return now ? 'Great week so far' : 'Great week';
 		if (adherence >= 0.6) return now ? 'Good week so far' : 'Good week';
-		return now ? 'Room to catch up' : 'Tough week';
+		if (adherence >= 0.4) return now ? 'Slipping behind' : 'Mixed week';
+		if (adherence > 0) return now ? 'Badly behind' : 'Bad week';
+		return now ? 'Nothing done so far' : 'Total failure';
 	}
 
 	onMount(() => {
