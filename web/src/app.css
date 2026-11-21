@@ -179,8 +179,9 @@ h1 {
 	min-width: 0;
 }
 /*
- * Adherence at a glance: frosted glass like the insight cards, as tall as the week line and headline
- * beside it, with the change on last week inside it after a hairline.
+ * Adherence at a glance, the focus of the header: a card filled with the week's grade colour (the same
+ * tier that picks the headline), as tall as the week line and headline beside it. The fills are deep
+ * enough for white text to keep at least 4.5:1, on any theme.
  */
 .pill {
 	display: flex;
@@ -188,29 +189,27 @@ h1 {
 	gap: 7px;
 	height: 51px;
 	padding: 0 10px 0 11px;
-	/* Flat like the insight cards under it: same glass, no shadow. */
 	border-radius: 10px;
-	background: rgba(255, 255, 255, 0.18);
+	background: var(--grade, rgba(255, 255, 255, 0.18));
+	box-shadow: 0 2px 8px rgba(40, 10, 90, 0.18);
 	color: #fff;
 }
-/* Graded like the headline. Light tints, so they read on the glass over the gradient. */
 .pill.great {
-	--grade: #8effc9;
+	--grade: #0b7a53;
 }
 .pill.good {
-	--grade: #d2f7a4;
+	--grade: #3f7a17;
 }
 .pill.mixed {
-	--grade: #ffd978;
+	--grade: #a85800;
 }
 .pill.bad {
-	--grade: #ffab85;
+	--grade: #c2410c;
 }
 .pill.failed {
-	--grade: #ff6b6b;
+	--grade: #b91c24;
 }
 .pill .num {
-	color: var(--grade, #fff);
 	font-size: 26px;
 	font-weight: 700;
 	line-height: 1;
@@ -229,7 +228,7 @@ h1 {
 	gap: 3px;
 	align-self: stretch;
 	padding-left: 7px;
-	border-left: 1px solid rgba(255, 255, 255, 0.28);
+	border-left: 1px solid rgba(255, 255, 255, 0.35);
 	margin: 12px 0;
 	font-size: 14px;
 	font-weight: 650;
@@ -237,12 +236,6 @@ h1 {
 }
 .pill .delta .arrow {
 	font-size: 10px;
-}
-.pill .delta.up .arrow {
-	color: #b4ffd9;
-}
-.pill .delta.down .arrow {
-	color: #ffd0cb;
 }
 
 /*
