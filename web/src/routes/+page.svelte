@@ -7,6 +7,7 @@
 	import HabitGrid from '#lib/HabitGrid.svelte';
 	import InsightCards from '#lib/InsightCards.svelte';
 	import PullToRefresh from '#lib/PullToRefresh.svelte';
+	import SwipeNav from '#lib/SwipeNav.svelte';
 
 	// Everything comes from GET /api/week. n8n keeps it up to date; days can
 	// also be corrected here.
@@ -63,12 +64,12 @@
 		return res.kind === 'offline' ? "Couldn't reach Loom." : res.message;
 	}
 
-	function go(delta: number) {
+	function go(delta: number): Promise<void> {
 		const base = current ?? latestStart;
-		if (!base) return;
+		if (!base) return Promise.resolve();
 		const next = addDays(base, delta * 7);
 		current = latestStart && next >= latestStart ? null : next;
-		load();
+		return load();
 	}
 
 	/** Change on last week in percentage points, or null when there's nothing to compare. */
@@ -187,20 +188,22 @@
 	{/if}
 
 	{#if week}
-		<section>
-			<div class="sec"><span>Habits</span></div>
-			<HabitGrid habits={week.habits} today={week.today} {isCurrent} onedit={edit} />
-		</section>
+		<SwipeNav canPrev={!!week} canNext={!!week && !isCurrent} onswipe={go}>
+			<section>
+				<div class="sec"><span>Habits</span></div>
+				<HabitGrid habits={week.habits} today={week.today} {isCurrent} onedit={edit} />
+			</section>
 
-		<section>
-			<div class="sec"><span>Short-term goals</span></div>
-			<GoalList goals={week.goals.short_term} today={week.today} />
-		</section>
+			<section>
+				<div class="sec"><span>Short-term goals</span></div>
+				<GoalList goals={week.goals.short_term} today={week.today} />
+			</section>
 
-		<section>
-			<div class="sec"><span>Perennial goals</span></div>
-			<GoalList goals={week.goals.perennial} today={week.today} />
-		</section>
+			<section>
+				<div class="sec"><span>Perennial goals</span></div>
+				<GoalList goals={week.goals.perennial} today={week.today} />
+			</section>
+		</SwipeNav>
 	{/if}
 
 	<!-- Always shown, so you can tell which build is installed even when loading fails. -->

@@ -28,6 +28,7 @@
 		if (!standalone) return;
 
 		let startY: number | null = null;
+		let startX = 0;
 
 		const reset = () => {
 			startY = null;
@@ -40,6 +41,7 @@
 			// Leave an open day menu alone: the pull would land under it.
 			const busy = refreshing || e.touches.length !== 1 || document.querySelector('[role="menu"]');
 			startY = atTop && !busy ? e.touches[0].clientY : null;
+			startX = e.touches[0].clientX;
 		};
 
 		const move = (e: TouchEvent) => {
@@ -48,6 +50,8 @@
 			if (!dragging) {
 				// Moving up, or the page already scrolled: this is a normal scroll.
 				if (dy < 0 || scrollY > 0) return void (startY = null);
+				// Mostly sideways: a swipe to another week, not a pull.
+				if (Math.abs(e.touches[0].clientX - startX) > dy) return void (startY = null);
 				if (dy < SLOP) return;
 				dragging = true;
 			}
