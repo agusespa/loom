@@ -30,7 +30,7 @@ test('shows the week, its details and the goals', async ({ page, request }) => {
 
 	await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Loading…');
 	// One workout done, one dance missed.
-	await expect(page.locator('.score .big')).toHaveText('50%');
+	await expect(page.locator('.pill .num')).toHaveText('50%');
 
 	const workout = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Workout' }) });
 	await workout.getByRole('cell', { name: /Monday: Done/ }).click();
@@ -45,7 +45,7 @@ test('shows the week, its details and the goals', async ({ page, request }) => {
 	await menu('Dance').getByRole('menuitemradio', { name: /Done/ }).click();
 	await expect(page.getByRole('menu')).toBeHidden();
 	await expect(dance.getByRole('cell', { name: /Monday: Done/ })).toBeVisible();
-	await expect(page.locator('.score .big')).toHaveText('100%');
+	await expect(page.locator('.pill .num')).toHaveText('100%');
 	// And clear it again.
 	await dance.getByRole('cell', { name: /Monday: Done/ }).click();
 	await menu('Dance').getByRole('menuitemradio', { name: /Nothing/ }).click();

@@ -71,22 +71,36 @@
 		load();
 	}
 
-	/** Good from 60%, where the headline starts saying "Good week"; bad under 40%. */
-	function grade(a: number | null): string {
-		if (a === null) return '';
-		return a >= 0.6 ? 'good' : a >= 0.4 ? 'ok' : 'bad';
+	/** Change on last week in percentage points, or null when there's nothing to compare. */
+	function delta(a: number, prev: number | null): number | null {
+		return prev === null ? null : Math.round(a * 100) - Math.round(prev * 100);
 	}
+
+	type Tier = 'great' | 'good' | 'mixed' | 'bad' | 'failed';
+
+	/** The week's grade: it picks both the headline and the score's color, so the two always agree. */
+	function tier(adherence: number): Tier {
+		if (adherence >= 0.85) return 'great';
+		if (adherence >= 0.6) return 'good';
+		if (adherence >= 0.4) return 'mixed';
+		if (adherence > 0) return 'bad';
+		return 'failed';
+	}
+
+	const HEADLINES: Record<Tier, [now: string, past: string]> = {
+		great: ['Great week so far', 'Great week'],
+		good: ['Good week so far', 'Good week'],
+		mixed: ['Slipping behind', 'Mixed week'],
+		bad: ['Badly behind', 'Bad week'],
+		failed: ['Nothing done so far', 'Total failure']
+	};
 
 	function headline(w: Week): string {
 		const { done, missed, planned, adherence } = w.summary;
 		const now = isCurrent;
 		if (done + missed + planned === 0) return now ? 'Nothing planned yet' : 'Quiet week';
 		if (adherence === null) return planned ? `${planned} planned` : 'Week ahead';
-		if (adherence >= 0.85) return now ? 'Great week so far' : 'Great week';
-		if (adherence >= 0.6) return now ? 'Good week so far' : 'Good week';
-		if (adherence >= 0.4) return now ? 'Slipping behind' : 'Mixed week';
-		if (adherence > 0) return now ? 'Badly behind' : 'Bad week';
-		return now ? 'Nothing done so far' : 'Total failure';
+		return HEADLINES[tier(adherence)][now ? 0 : 1];
 	}
 
 	onMount(() => {
@@ -102,38 +116,56 @@
 <main>
 	<div class="band band-top" style:--band-h={bandH} bind:offsetHeight={topH}>
 		<header class="top">
-			<button class="nav" id="prev" aria-label="Previous week" disabled={!week} onclick={() => go(-1)}
-				>‹</button
-			>
 			<div class="top-mid">
-				<div class="muted small">
-					{#if week}
-						Week {isoWeek(week.start)} · {fmt(week.start, { day: 'numeric', month: 'short' })}–{fmt(
-							week.end,
-							{
-								day: 'numeric',
-								month: 'short'
-							}
-						)}
-					{:else}&nbsp;{/if}
+				<div class="week-nav muted small">
+					<button class="nav" id="prev" aria-label="Previous week" disabled={!week} onclick={() => go(-1)}
+						><svg class="chev" viewBox="0 0 9 14" aria-hidden="true"><path d="M7.5 1.5 2 7l5.5 5.5" /></svg
+						></button
+					>
+					<span class="week-label">
+						{#if week}
+							Week {isoWeek(week.start)} · {fmt(week.start, { day: 'numeric', month: 'short' })}–{fmt(
+								week.end,
+								{ day: 'numeric', month: 'short' }
+							)}
+						{:else}&nbsp;{/if}
+					</span>
+					<button
+						class="nav"
+						id="next"
+						aria-label="Next week"
+						disabled={!week || isCurrent}
+						onclick={() => go(1)}
+						><svg class="chev" viewBox="0 0 9 14" aria-hidden="true"><path d="M1.5 1.5 7 7l-5.5 5.5" /></svg
+						></button
+					>
 				</div>
 				<h1>{week ? headline(week) : loading ? 'Loading…' : 'Loom'}</h1>
 			</div>
 			<div class="score">
-				{#if week}
+				{#if week && week.summary.adherence !== null}
 					{@const a = week.summary.adherence}
-					<div class="big {grade(a)}">{pct(a)}</div>
-					<div class="muted small">
-						{week.prev_adherence === null ? ' ' : `vs ${pct(week.prev_adherence)} last wk`}
+					{@const d = delta(a, week.prev_adherence)}
+					<div class="pill {tier(a)}">
+						<span class="num">{Math.round(a * 100)}<span class="unit">%</span></span>
+						{#if d !== null}
+							<span
+								class="delta"
+								class:up={d > 0}
+								class:down={d < 0}
+								title="vs {pct(week.prev_adherence)} last week"
+								aria-label="{d > 0 ? 'Up' : d < 0 ? 'Down' : 'Level'} {Math.abs(d)} points on last week"
+							>
+								<span class="arrow" aria-hidden="true">{d > 0 ? '▲' : d < 0 ? '▼' : '='}</span>{d === 0
+									? ''
+									: Math.abs(d)}
+							</span>
+						{/if}
 					</div>
 				{:else}
-					<div class="big">–</div>
-					<div class="muted small">&nbsp;</div>
+					<div class="pill"><span class="num">–</span></div>
 				{/if}
 			</div>
-			<button class="nav" id="next" aria-label="Next week" disabled={!week || isCurrent} onclick={() => go(1)}
-				>›</button
-			>
 		</header>
 	</div>
 	{#if week}

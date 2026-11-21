@@ -17,11 +17,6 @@
 	--accent: #1d1c1a;
 	--accent-fg: #ffffff;
 	--bar: #12b886;
-	/* The score's grade, on its pill. */
-	--pill: rgba(255, 255, 255, 0.95);
-	--good: #0f9d6b;
-	--ok: #c77700;
-	--bad: #d93f35;
 	/* One thread color per habit, by position. */
 	--thread-0: #ff5a4e;
 	--thread-1: #8b5cf6;
@@ -54,10 +49,6 @@
 		--accent: #f4f4f2;
 		--accent-fg: #121214;
 		--bar: #38d9a9;
-		--pill: rgba(18, 18, 20, 0.55);
-		--good: #2bd69a;
-		--ok: #ffc145;
-		--bad: #ff8a80;
 		--thread-0: #ff7a6e;
 		--thread-1: #a78bfa;
 		--thread-2: #4dabf7;
@@ -102,6 +93,10 @@ h1 {
 	font-size: 22px;
 	font-weight: 600;
 	margin: 2px 0 0;
+	/* Always one line: a headline that doesn't fit is cut short rather than wrapped. */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	letter-spacing: -0.01em;
 }
 .muted {
@@ -175,54 +170,120 @@ h1 {
 .top {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 12px;
 }
 .top-mid {
 	flex: 1;
 	min-width: 0;
 }
-.score {
-	text-align: right;
-}
-/* Adherence at a glance: graded colors on a pill, so they read on the band. */
-.score .big.good,
-.score .big.ok,
-.score .big.bad {
-	display: inline-block;
-	background: var(--pill);
-	padding: 0 9px;
+/*
+ * Adherence at a glance: frosted glass like the insight cards, as tall as the week line and headline
+ * beside it, with the change on last week inside it after a hairline.
+ */
+.pill {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	height: 51px;
+	padding: 0 10px 0 11px;
+	/* Flat like the insight cards under it: same glass, no shadow. */
 	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.18);
+	color: #fff;
 }
-.score .big.good {
-	color: var(--good);
+/* Graded like the headline. Light tints, so they read on the glass over the gradient. */
+.pill.great {
+	--grade: #8effc9;
 }
-.score .big.ok {
-	color: var(--ok);
+.pill.good {
+	--grade: #d2f7a4;
 }
-.score .big.bad {
-	color: var(--bad);
+.pill.mixed {
+	--grade: #ffd978;
 }
-.score .muted {
-	margin-top: 3px;
+.pill.bad {
+	--grade: #ffab85;
+}
+.pill.failed {
+	--grade: #ff6b6b;
+}
+.pill .num {
+	color: var(--grade, #fff);
+	font-size: 26px;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.04em;
+}
+.pill .unit {
+	font-size: 0.6em;
+	font-weight: 600;
+	letter-spacing: 0;
+	margin-left: 1px;
+	opacity: 0.85;
+}
+.pill .delta {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	align-self: stretch;
+	padding-left: 7px;
+	border-left: 1px solid rgba(255, 255, 255, 0.28);
+	margin: 12px 0;
+	font-size: 14px;
+	font-weight: 650;
+	font-variant-numeric: tabular-nums;
+}
+.pill .delta .arrow {
+	font-size: 10px;
+}
+.pill .delta.up .arrow {
+	color: #b4ffd9;
+}
+.pill .delta.down .arrow {
+	color: #ffd0cb;
 }
 
+/*
+ * The week arrows sit on the week line, either side of the dates, so they take no width from the
+ * headline and the score. They keep a finger-sized tap area that spills past the small text.
+ */
+.week-nav {
+	display: flex;
+	align-items: center;
+	height: 17px; /* one line of small text, as before */
+	/* The back arrow's tap area spills left, so the arrow itself lines up with the headline. */
+	margin-left: -7px; /* the button's padding plus the chevron's own inset */
+}
+.week-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 .nav {
+	flex: none;
+	display: flex;
 	border: 0;
 	background: none;
 	color: var(--muted);
-	font-size: 26px;
-	line-height: 1;
-	padding: 4px 6px;
+	padding: 12px 6px;
+	margin: -12px 0;
 	cursor: pointer;
+}
+/* Drawn rather than typed, so it sits exactly on the dates' cap height whatever the font. */
+.chev {
+	width: 9px;
+	height: 14px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 .nav:disabled {
 	visibility: hidden;
 }
 #prev {
-	margin-left: -8px;
-}
-#next {
-	margin-right: -8px;
+	padding-right: 6px;
 }
 
 .banner {
