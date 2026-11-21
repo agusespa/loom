@@ -1,0 +1,256 @@
+// Package api serves the n8n write API, the week endpoint the app reads and
+// the embedded frontend.
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"log"
+	"net/http"
+	"path"
+	"strings"
+	"time"
+
+	"github.com/agusespa/loom/internal/store"
+)
+
+const maxBody = 1 << 20
+
+// Clock says which tracker day it is. The tracker day starts at DayStart
+// (05:00 by default), so a workout synced at 01:00 still counts for the day before.
+type Clock struct {
+	Loc      *time.Location
+	DayStart time.Duration
+	Now      func() time.Time // nil means time.Now
+}
+
+// Today returns the current tracker day as a UTC midnight.
+func (c Clock) Today() time.Time {
+	now := time.Now
+	if c.Now != nil {
+		now = c.Now
+	}
+	t := now().In(c.Loc).Add(-c.DayStart)
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// New returns the HTTP handler. static is the frontend.
+//
+// The app has no login of its own. From outside it is reached only through
+// Cloudflare Access; n8n calls it over the Docker network. Requests that
+// change data are refused when a browser marks them as coming from another
+// site, so a page you visit can't use your Access session to edit data.
+func New(s *store.Store, static fs.FS, clock Clock) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /api/week", weekHandler(s, clock))
+	mux.Handle("GET /api/habits", habitsHandler(s))
+	mux.Handle("PUT /api/habits/{key}", putHabitHandler(s))
+	mux.Handle("PUT /api/days/{date}/{habit}", putDayHandler(s))
+	mux.Handle("DELETE /api/days/{date}/{habit}", deleteDayHandler(s))
+	mux.Handle("GET /api/goals/{list}", goalsHandler(s))
+	mux.Handle("PUT /api/goals/{list}", replaceGoalsHandler(s))
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	mux.HandleFunc("GET /api/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := s.Ready(ctx); err != nil {
+			log.Printf("readiness: %v", err)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	})
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
+		jsonError(w, http.StatusNotFound, "not found")
+	})
+	mux.Handle("/", staticHandler(static))
+
+	csrf := http.NewCrossOriginProtection()
+	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		jsonError(w, http.StatusForbidden, "cross-origin request refused")
+	}))
+	return csrf.Handler(mux)
+}
+
+// GET /api/week?start=YYYY-MM-DD (a Monday). Without start: the current week.
+func weekHandler(s *store.Store, clock Clock) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		today := clock.Today()
+		var monday time.Time
+		if q := r.URL.Query().Get("start"); q != "" {
+			t, err := time.Parse(time.DateOnly, q)
+			if err != nil || t.Weekday() != time.Monday {
+				jsonError(w, http.StatusBadRequest, "start must be a Monday as YYYY-MM-DD")
+				return
+			}
+			monday = t
+		} else {
+			monday = today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
+		}
+		week, err := s.Week(r.Context(), monday)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, struct {
+			*store.Week
+			Today string `json:"today"`
+		}{week, today.Format(time.DateOnly)})
+	}
+}
+
+func habitsHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		habits, err := s.Habits(r.Context())
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"habits": habits})
+	}
+}
+
+// PUT /api/habits/{key} {"name": "Workout", "position": 1, "plannable": true}
+func putHabitHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var h store.Habit
+		if !decode(w, r, &h) {
+			return
+		}
+		h.Key = r.PathValue("key")
+		if err := s.PutHabit(r.Context(), h); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, h)
+	}
+}
+
+// PUT /api/days/{date}/{habit} {"status": "done", "value": 12, "note": "Upper-body"}
+func putDayHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var d store.Day
+		if !decode(w, r, &d) {
+			return
+		}
+		d.Date = r.PathValue("date")
+		if err := s.PutDay(r.Context(), r.PathValue("habit"), d); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, d)
+	}
+}
+
+func deleteDayHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := s.DeleteDay(r.Context(), r.PathValue("habit"), r.PathValue("date")); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func goalsHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list := r.PathValue("list")
+		if list != store.ListShortTerm && list != store.ListPerennial {
+			jsonError(w, http.StatusNotFound, "list must be short_term or perennial")
+			return
+		}
+		goals, err := s.Goals(r.Context(), list)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"goals": goals})
+	}
+}
+
+// PUT /api/goals/{list} {"goals": [...]} replaces that list.
+func replaceGoalsHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Goals *[]store.Goal `json:"goals"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		if body.Goals == nil {
+			jsonError(w, http.StatusBadRequest, "goals is required (send [] to empty the list)")
+			return
+		}
+		if err := s.ReplaceGoals(r.Context(), r.PathValue("list"), *body.Goals); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]int{"count": len(*body.Goals)})
+	}
+}
+
+// ---------- helpers ----------
+
+func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return false
+	}
+	return true
+}
+
+func writeStoreError(w http.ResponseWriter, err error) {
+	var verr *store.ValidationError
+	switch {
+	case errors.As(err, &verr):
+		jsonError(w, http.StatusBadRequest, verr.Error())
+	case errors.Is(err, store.ErrNotFound):
+		jsonError(w, http.StatusNotFound, "unknown habit")
+	default:
+		serverError(w, err)
+	}
+}
+
+func serverError(w http.ResponseWriter, err error) {
+	log.Printf("internal error: %v", err)
+	jsonError(w, http.StatusInternalServerError, "internal error")
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func jsonError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// staticHandler serves the frontend. The service worker and the page itself
+// must revalidate so a new release reaches the phone on its next open.
+func staticHandler(static fs.FS) http.Handler {
+	files := http.FileServerFS(static)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if name == "" {
+			name = "index.html"
+		}
+		if _, err := fs.Stat(static, name); err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "no-cache")
+		if name == "sw.js" {
+			w.Header().Set("Service-Worker-Allowed", "/")
+		}
+		files.ServeHTTP(w, r)
+	})
+}

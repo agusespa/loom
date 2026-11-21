@@ -1,0 +1,8 @@
+coverage.out
+.DS_Store
+.env
+/bin/
+/data/
+
+# Claude Code local config
+.claude/
