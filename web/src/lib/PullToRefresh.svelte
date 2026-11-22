@@ -15,6 +15,11 @@
 	const MAX = 110;
 	/** Finger travel (px) ignored before a pull starts, so taps and small jitters don't count. */
 	const SLOP = 6;
+	/**
+	 * The spinner stays at least this long (ms). The week usually comes back almost at once, and a
+	 * spinner that only flashes looks like nothing happened.
+	 */
+	const MIN_SPIN = 700;
 
 	let pull = $state(0);
 	let dragging = $state(false);
@@ -68,7 +73,7 @@
 			pull = THRESHOLD;
 			refreshing = true;
 			try {
-				await onrefresh();
+				await Promise.all([onrefresh(), new Promise((r) => setTimeout(r, MIN_SPIN))]);
 			} finally {
 				refreshing = false;
 				reset();
