@@ -92,7 +92,8 @@ main {
 }
 
 h1 {
-	font-size: 22px;
+	font-size: 24px;
+	line-height: 34px;
 	font-weight: 600;
 	margin: 2px 0 0;
 	/* Always one line: a headline that doesn't fit is cut short rather than wrapped. */
@@ -187,7 +188,7 @@ h1 {
 	display: flex;
 	align-items: center;
 	gap: 7px;
-	height: 51px;
+	height: 56px;
 	padding: 0 10px 0 11px;
 	border-radius: 10px;
 	background: var(--grade, rgba(255, 255, 255, 0.18));
@@ -245,7 +246,8 @@ h1 {
 .week-nav {
 	display: flex;
 	align-items: center;
-	height: 17px; /* one line of small text, as before */
+	height: 20px; /* one line of the week text */
+	font-size: 14px;
 	/* The back arrow's tap area spills left, so the arrow itself lines up with the headline. */
 	margin-left: -7px; /* the button's padding plus the chevron's own inset */
 }
@@ -305,12 +307,13 @@ h1 {
 	min-width: 0;
 }
 .card .muted {
+	font-size: 13px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .card .v {
-	font-size: 18px;
+	font-size: 20px;
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
 }
@@ -323,7 +326,7 @@ h1 {
 	margin-left: 3px;
 }
 .card .sub {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--muted);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -361,10 +364,15 @@ h1 {
 	color: var(--muted);
 	margin: 24px 0 8px;
 }
+.sec {
+	align-items: baseline;
+	margin: 28px 0 10px;
+}
 .sec > span:first-child {
 	color: var(--text);
-	font-weight: 600;
-	font-size: 13px;
+	font-weight: 700;
+	font-size: 19px;
+	letter-spacing: -0.01em;
 }
 
 .grid {
@@ -373,25 +381,37 @@ h1 {
 	border-radius: var(--radius);
 	padding: 12px;
 }
+/*
+ * One grid for all rows (each row is a subgrid), so the names column is only as wide as the
+ * longest name (at most 40%) and the days share the rest.
+ */
+.grid[role='table'] {
+	display: grid;
+	grid-template-columns: fit-content(40%) repeat(7, minmax(0, 1fr));
+	column-gap: 5px;
+	row-gap: 8px;
+}
 .row {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) repeat(7, 28px);
-	gap: 5px;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
 	align-items: center;
+	justify-items: center;
 }
-.row + .row {
-	margin-top: 8px;
+.row > .name {
+	justify-self: stretch;
+	margin-right: 6px;
 }
 .row.head {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--faint);
 	text-align: center;
 }
 .row.head .today-l {
-	justify-self: center;
-	width: 20px;
-	height: 20px;
-	line-height: 20px;
+	width: 22px;
+	height: 22px;
+	line-height: 22px;
+	text-align: center;
 	border-radius: 50%;
 	background: var(--accent);
 	color: var(--accent-fg);
@@ -406,8 +426,9 @@ h1 {
 }
 
 .d {
-	width: 28px;
-	height: 28px;
+	width: 100%;
+	max-width: 40px;
+	aspect-ratio: 1;
 	border-radius: 8px;
 	border: 0;
 	padding: 0;

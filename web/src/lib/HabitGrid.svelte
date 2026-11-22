@@ -122,7 +122,7 @@
 							: 'nothing'}"
 						onclick={(e) => open(e, h.key, d.date)}
 					>
-						{#if d.status}<StatusIcon status={d.status} />{/if}
+						{#if d.status}<StatusIcon status={d.status} size={16} />{/if}
 					</button>
 				{/each}
 			</div>
