@@ -4,15 +4,15 @@
 
 A life dashboard you install on your phone as a PWA: this week's habits, how they compare with last week, and your goals.
 
-Loom is where habit days live. **n8n does the tracking**: it works out each habit's status (from the calendar, the gym app, an iPhone Shortcut and git commits) and copies goals in from Notion. When an automation gets a day wrong, or a session wasn't recorded, you fix it in the app: tap a day and pick a status.
+Loom is where habit days live. **Your automations do the tracking**: an n8n workflow (or anything else that can make HTTP requests) works out each habit's status from the sources you connect, such as a calendar, a fitness app or a phone shortcut, and copies your goals in from wherever you keep them. When an automation gets a day wrong, or something wasn't recorded, you fix it in the app: tap a day and pick a status.
 
 ```
-Calendar, gym app, Shortcut, git ─▶ n8n ─▶ PUT /api/days/...   ─▶ SQLite ─▶ GET /api/week ─▶ PWA
-Notion goal databases            ─▶ n8n ─▶ PUT /api/goals/...  ─┤
+Calendar, apps, shortcuts ─▶ automation ─▶ PUT /api/days/...   ─▶ SQLite ─▶ GET /api/week ─▶ PWA
+Goal tracker              ─▶ automation ─▶ PUT /api/goals/...  ─┤
 Corrections in the app                  ─▶ PUT /api/days/...   ─┘
 ```
 
-Loom has no login of its own. From outside, it's reachable only through Cloudflare Access, which is what protects edits made in the app. n8n calls it over the Docker network.
+Loom has no login of its own. Put it behind an access proxy such as Cloudflare Access, which is what protects edits made in the app, and let your automations call it over a private network.
 
 ## Install
 
@@ -20,13 +20,13 @@ Run `ghcr.io/agusespa/loom` (amd64 and arm64; tags `:X.Y.Z`, `:X.Y` and `:latest
 
 ## Data model
 
-**Habits** have a key, a name, a position, `plannable` and `archived`. Plannable habits (Workout, Dance) can be `planned`, `done` or `missed` and count toward adherence. Writing is only ever `done`. The schema creates these three. Habits are never deleted: an archived habit leaves the dashboard (grid, adherence, insights) but keeps its history.
+**Habits** have a key, a name, a position, `plannable` and `archived`. Plannable habits (say, a workout you schedule) can be `planned`, `done` or `missed` and count toward adherence. Other habits (say, a daily walk) are only ever `done`. Habits are never deleted: an archived habit leaves the dashboard (grid, adherence, insights) but keeps its history.
 
-**Habit days** hold a `status` per habit per tracker day, and a `source` saying who set it: `app` for a correction made in the PWA, `n8n` for an automation. Loom works the source out itself (browsers send `Sec-Fetch-Site`, and Cloudflare Access adds the signed-in user; n8n's calls carry neither), so clients can't claim one. A blank day has no row. The tracker day runs from 05:00 to 05:00 (`DAY_START_HOUR`). n8n decides which date something belongs to. Loom uses the boundary only to know which day is "today".
+**Habit days** hold a `status` per habit per tracker day, and a `source` saying who set it: `app` for a correction made in the PWA, or `n8n` for an automation. Loom works the source out itself (browsers send `Sec-Fetch-Site`, and the access proxy adds the signed-in user; automations carry neither), so clients can't claim one. A blank day has no row. The tracker day runs from 05:00 to 05:00 (`DAY_START_HOUR`), so something done after midnight still counts for the day before. Your automations decide which date something belongs to. Loom uses the boundary only to know which day is "today".
 
 The tables are `STRICT` and carry their own checks (key and date formats, ranges, allowed values), so a bad write is refused even if it gets past the Go validation.
 
-**Goals** are read-only copies of the Notion Short-term Goals and Perennial Goals databases. Progress is the `Progress` you set in Notion (0-1). Tapping a goal opens its Notion page.
+**Goals** are read-only copies of two lists you keep elsewhere: short-term goals and perennial goals. Progress is a number from 0 to 1. Tapping a goal opens its `url`.
 
 **Adherence** is done / (done + missed) over the plannable habits for the week. It stays empty until something planned has been done or missed.
 
@@ -45,16 +45,16 @@ Every request that changes data refuses browser requests from other sites (`Sec-
 | `GET` / `PUT` | `/api/habits`, `/api/habits/{key}` | `{"name", "position", "plannable", "archived"}` | Add, rename or archive a habit. |
 | `GET` | `/api/healthz`, `/api/readyz` | | `loom healthcheck` probes readiness. |
 
-### From n8n
+### From an automation
 
-Use an **HTTP Request** node against `http://loom:8080`:
+In n8n, use an **HTTP Request** node against Loom's address on your network, for example `http://loom:8080`. Typical jobs:
 
-The 05:00 jobs use `?if=` so they never undo a day you corrected by hand. Marking a day done needs no condition, since done is always right once it happened.
+- **Plan the day** (at the start of the tracker day): for each plannable habit scheduled today, `PUT /api/days/{{today}}/{habit}?if=blank` with `{"status": "planned"}`.
+- **Close past days** (same job): `GET /api/days?status=planned&before={{today}}` and, for each day, `PUT ...?if=planned` with `{"status": "missed"}` if it was still scheduled, or `{"status": null}` if it was moved or cancelled.
+- **Record what happened** (from a webhook, an app or a shortcut): `PUT /api/days/{{date}}/{habit}` with `{"status": "done"}`. No condition: done replaces planned or missed, since it's always right once it happened.
+- **Sync goals** (on a schedule): read your goal tracker, map its fields to Loom's, and `PUT /api/goals/short_term` and `/api/goals/perennial` with the whole list.
 
-- **Fitness Tracker, 05:00**: for each habit with a calendar event today, `PUT /api/days/{{today}}/{habit}?if=blank` with `{"status": "planned"}`. Then `GET /api/days?status=planned&before={{today}}` and, for each day, `PUT ...?if=planned` with `{"status": "missed"}` if its event is still on that day, or `{"status": null}` if it moved or was deleted.
-- **Fitness Tracker, webhooks**: a saved gym workout or a Shortcut dance sends `PUT /api/days/{{date}}/workout` (or `dance`) with `{"status": "done"}`. No condition: done replaces planned or missed.
-- **Writing Tracker**: `PUT /api/days/{{date}}/writing` with `{"status": "done"}`.
-- **Goals sync** (on a schedule): query each Notion goal database, map `Priority` "High priority" to `high` and so on, and `PUT /api/goals/short_term` and `/api/goals/perennial` with the whole list.
+The scheduled jobs use `?if=` so they never undo a day you corrected by hand.
 
 ## Configuration
 
@@ -64,4 +64,3 @@ The 05:00 jobs use `?if=` so they never undo a day you corrected by hand. Markin
 | `DB_PATH` | `data/loom.db` | `/app/data/loom.db` in the image |
 | `TIMEZONE` | `Europe/Stockholm` | Decides which day is "today" |
 | `DAY_START_HOUR` | `5` | When the tracker day rolls over |
-
