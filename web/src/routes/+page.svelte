@@ -37,11 +37,21 @@
 
 	const isCurrent = $derived(!!week && (current === null || week.start === latestStart));
 
+	// Weeks already seen, by Monday, for this visit only: going back to one shows it at once while
+	// load() fetches it again in the background.
+	const seen = new Map<string, Week>();
+	// Counts loads, so only the newest one is applied: tapping through weeks quickly has several
+	// in flight, and an older answer arriving last mustn't overwrite the week you're on.
+	let loads = 0;
+
 	async function load() {
+		const n = ++loads;
 		const res = await fetchWeek(current);
+		if (n !== loads) return;
 		loading = false;
 		if (res.kind === 'ok') {
 			if (current === null) latestStart = res.week.start;
+			seen.set(res.week.start, res.week);
 			week = res.week;
 			banner = null;
 		} else if (res.kind === 'error') {
@@ -69,7 +79,11 @@
 		if (!base) return Promise.resolve();
 		const next = addDays(base, delta * 7);
 		current = latestStart && next >= latestStart ? null : next;
-		return load();
+		const cached = seen.get(current ?? latestStart!);
+		const fresh = load();
+		if (!cached) return fresh;
+		week = cached;
+		return Promise.resolve();
 	}
 
 	/** Change on last week in percentage points, or null when there's nothing to compare. */
