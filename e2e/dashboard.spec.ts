@@ -51,6 +51,18 @@ test('shows the week, its details and the goals', async ({ page, request }) => {
 	await menu('Dance').getByRole('menuitemradio', { name: /Nothing/ }).click();
 	await expect(dance.getByRole('cell', { name: /Monday: nothing/ })).toBeVisible();
 
+	// The insight cards open a table of every habit's streak and adherence.
+	const cards = page.getByRole('button', { name: /streaks and adherence by habit/ });
+	const table = page.locator('#habit-insights');
+	await expect(cards).toHaveAttribute('aria-expanded', 'false');
+	await cards.click();
+	await expect(cards).toHaveAttribute('aria-expanded', 'true');
+	const row = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Workout' }) });
+	await expect(row).toContainText('1 session');
+	await expect(row).toContainText('100%');
+	await cards.click();
+	await expect(table).toBeHidden();
+
 	const goal = page.getByRole('link', { name: /Bench 100 kg/ });
 	await expect(goal).toHaveAttribute('href', 'https://www.notion.so/s1');
 	await expect(goal).toContainText('50%');
@@ -59,6 +71,8 @@ test('shows the week, its details and the goals', async ({ page, request }) => {
 	// Last week has nothing, and there's no going past this week.
 	await page.getByRole('button', { name: 'Previous week' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Quiet week');
+	// With no score there's no score card.
+	await expect(page.locator('.pill')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Next week' }).click();
 	await expect(page.getByText(/^Week \d+ · /)).toBeVisible();
 	// Disabled nav buttons are hidden.

@@ -28,7 +28,7 @@ The tables are `STRICT` and carry their own checks (key and date formats, ranges
 
 **Goals** are read-only copies of goals you keep elsewhere. Progress is a number from 0 to 1. Tapping a goal opens its `url`.
 
-**Adherence** is done / (done + missed) over the plannable habits for the week. It stays empty until something planned has been done or missed.
+**Adherence** is done / (done + missed) over the plannable habits for the week. It stays empty until something planned has been done or missed. The insight cards under the header count every habit over the last 8 weeks instead: a plannable habit's chances are its sessions done or missed, any other habit's are the days since it was first done. Tap them for each habit's streak and adherence.
 
 ## Configuration
 

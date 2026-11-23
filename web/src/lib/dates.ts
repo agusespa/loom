@@ -27,6 +27,11 @@ export function pct(x: number | null | undefined): string {
 	return x === null || x === undefined ? '–' : Math.round(x * 100) + '%';
 }
 
+/** Change in whole percentage points from prev to a; null when there's nothing to compare. */
+export function delta(a: number | null, prev: number | null): number | null {
+	return a === null || prev === null ? null : Math.round(a * 100) - Math.round(prev * 100);
+}
+
 export function ago(ms: number, now = Date.now()): string {
 	const min = Math.round((now - ms) / 60000);
 	if (min < 1) return 'just now';

@@ -101,7 +101,12 @@ func (s *Store) Week(ctx context.Context, monday, today time.Time) (*Week, error
 	if w.Insights, err = s.insights(ctx, habits, monday, today); err != nil {
 		return nil, err
 	}
-	w.PrevAdherence = w.Insights.Trend[TrendWeeks-2] // the trend ends with this week
+	last := monday.AddDate(0, 0, -7)
+	prev, err := s.summary(ctx, last.Format(time.DateOnly), last.AddDate(0, 0, 6).Format(time.DateOnly))
+	if err != nil {
+		return nil, err
+	}
+	w.PrevAdherence = prev.Adherence
 
 	if w.Goals.ShortTerm, err = s.Goals(ctx, ListShortTerm); err != nil {
 		return nil, err

@@ -2,7 +2,7 @@
 	import { version } from '$app/env';
 	import { onMount } from 'svelte';
 	import { fetchWeek, putDay, type Status, type Week } from '#lib/api.ts';
-	import { addDays, ago, fmt, isoWeek, pct } from '#lib/dates.ts';
+	import { addDays, ago, delta, fmt, isoWeek, pct } from '#lib/dates.ts';
 	import GoalList from '#lib/GoalList.svelte';
 	import HabitGrid from '#lib/HabitGrid.svelte';
 	import InsightCards from '#lib/InsightCards.svelte';
@@ -87,10 +87,6 @@
 	}
 
 	/** Change on last week in percentage points, or null when there's nothing to compare. */
-	function delta(a: number, prev: number | null): number | null {
-		return prev === null ? null : Math.round(a * 100) - Math.round(prev * 100);
-	}
-
 	type Tier = 'great' | 'good' | 'mixed' | 'bad' | 'failed';
 
 	/** The week's grade: it picks both the headline and the score's color, so the two always agree. */
@@ -157,10 +153,11 @@
 				</div>
 				<h1>{week ? headline(week) : loading ? 'Loading…' : 'Loom'}</h1>
 			</div>
-			<div class="score">
-				{#if week && week.summary.adherence !== null}
-					{@const a = week.summary.adherence}
-					{@const d = delta(a, week.prev_adherence)}
+			<!-- No score yet (nothing planned done or missed): no score card at all. -->
+			{#if week && week.summary.adherence !== null}
+				{@const a = week.summary.adherence}
+				{@const d = delta(a, week.prev_adherence)}
+				<div class="score">
 					<div class="pill {tier(a)}">
 						<span class="num">{Math.round(a * 100)}<span class="unit">%</span></span>
 						{#if d !== null}
@@ -177,10 +174,8 @@
 							</span>
 						{/if}
 					</div>
-				{:else}
-					<div class="pill"><span class="num">–</span></div>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		</header>
 	</div>
 	{#if week}

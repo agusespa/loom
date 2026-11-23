@@ -66,35 +66,54 @@ func TestStreakSessions(t *testing.T) {
 	}
 }
 
-func TestTrendAndLast30(t *testing.T) {
+func eq(a *float64, want float64) bool { return a != nil && *a == want }
+
+func TestTrendAndAdherence(t *testing.T) {
 	s := open(t)
-	put(t, s, "workout", "2026-11-16", ptr(StatusDone))   // this week: 100%
-	put(t, s, "workout", "2026-11-10", ptr(StatusMissed)) // last week: 50%
-	put(t, s, "dance", "2026-11-12", ptr(StatusDone))
-	put(t, s, "workout", "2026-10-20", ptr(StatusDone))   // 4 weeks back
-	put(t, s, "writing", "2026-10-19", ptr(StatusDone))   // 31 days before the 18th: outside last 30
-	put(t, s, "writing", "2026-10-20", ptr(StatusDone))   // 30th day back: inside
+	put(t, s, "workout", "2026-11-16", ptr(StatusDone))
+	put(t, s, "workout", "2026-11-10", ptr(StatusMissed))
+	put(t, s, "workout", "2026-10-20", ptr(StatusDone))
 	put(t, s, "workout", "2026-11-19", ptr(StatusDone))   // after today: outside
-	put(t, s, "workout", "2026-09-21", ptr(StatusMissed)) // 9 weeks back: outside the trend
+	put(t, s, "workout", "2026-09-21", ptr(StatusMissed)) // 57 days before the 18th: the previous stretch
+	put(t, s, "dance", "2026-11-12", ptr(StatusDone))
+	// Writing starts on the 14th: no chances before it. Today (18th) isn't done yet.
+	for _, d := range []string{"2026-11-14", "2026-11-15", "2026-11-17"} {
+		put(t, s, "writing", d, ptr(StatusDone))
+	}
 
 	in := insightsFor(t, s, "2026-11-18")
 	if in.AsOf != "2026-11-18" || len(in.Trend) != TrendWeeks {
 		t.Fatalf("as of %s, trend %v", in.AsOf, in.Trend)
 	}
-	// Oldest first: the weeks of 28 Sep ... 16 Nov (21 Sep is one too far back).
-	if in.Trend[0] != nil || *in.Trend[3] != 1 || in.Trend[4] != nil || *in.Trend[6] != 0.5 || *in.Trend[7] != 1 {
+	// Oldest first: the weeks of 28 Sep ... 16 Nov. Week of 9 Nov: workout 0/1, dance 1/1,
+	// writing 2/2. This week, up to today: workout 1/1, writing 1/2.
+	if in.Trend[0] != nil || !eq(in.Trend[3], 1) || in.Trend[4] != nil || !eq(in.Trend[6], 0.75) || !eq(in.Trend[7], 2.0/3) {
 		t.Fatalf("trend: %v", in.Trend)
 	}
-	if in.Last30.From != "2026-10-20" || in.Last30.To != "2026-11-18" {
-		t.Fatalf("range %s..%s", in.Last30.From, in.Last30.To)
+	// Workout 2/3, dance 1/1, writing 3/4; before: workout 0/1.
+	if !eq(in.Adherence, 0.75) || !eq(in.PrevAdherence, 0) {
+		t.Fatalf("adherence %v, prev %v", in.Adherence, in.PrevAdherence)
 	}
-	got := map[string]int{}
-	for _, h := range in.Last30.Habits {
-		got[h.Key] = h.Done
+	got := map[string]HabitInsight{}
+	for _, h := range in.Habits {
+		got[h.Key] = h
 	}
-	// The trend counts the whole week, but the 30 days stop at today.
-	if got["workout"] != 2 || got["dance"] != 1 || got["writing"] != 1 {
-		t.Fatalf("last 30: %v", got)
+	if w := got["workout"]; !eq(w.Adherence, 2.0/3) || !eq(w.PrevAdherence, 0) || w.Streak != 1 || w.Unit != "sessions" {
+		t.Fatalf("workout: %+v", w)
+	}
+	if d := got["dance"]; !eq(d.Adherence, 1) || d.PrevAdherence != nil {
+		t.Fatalf("dance: %+v", d)
+	}
+	if w := got["writing"]; !eq(w.Adherence, 0.75) || w.PrevAdherence != nil || w.Streak != 1 || w.Unit != "days" {
+		t.Fatalf("writing: %+v", w)
+	}
+
+	// Writing today makes it 4 of 5.
+	put(t, s, "writing", "2026-11-18", ptr(StatusDone))
+	for _, h := range insightsFor(t, s, "2026-11-18").Habits {
+		if h.Key == "writing" && !eq(h.Adherence, 0.8) {
+			t.Fatalf("writing with today: %+v", h)
+		}
 	}
 
 	// A past week counts up to its Sunday.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, ago, isoWeek, pct } from './dates.ts';
+import { addDays, ago, delta, isoWeek, pct } from './dates.ts';
 
 describe('isoWeek', () => {
 	it('numbers weeks by their Thursday', () => {
@@ -33,5 +33,14 @@ describe('ago', () => {
 		expect(ago(now - 5 * 60_000, now)).toBe('5 min ago');
 		expect(ago(now - 3 * 3600_000, now)).toBe('3 h ago');
 		expect(ago(now - 3 * 86400_000, now)).toBe('3 days ago');
+	});
+});
+
+describe('delta', () => {
+	it('compares rounded percentages', () => {
+		expect(delta(0.784, 0.721)).toBe(6);
+		expect(delta(0.5, 0.5)).toBe(0);
+		expect(delta(0.5, null)).toBeNull();
+		expect(delta(null, 0.5)).toBeNull();
 	});
 });

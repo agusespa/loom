@@ -1,16 +1,19 @@
 <script lang="ts">
 	import type { Insights } from './api.ts';
-	import { pct } from './dates.ts';
+	import { slide } from 'svelte/transition';
+	import { delta, pct } from './dates.ts';
+	import { motion } from './motion.ts';
 
 	let { insights }: { insights: Insights } = $props();
 
+	// Tapping the cards shows every habit's streak and adherence. Closed, each card has the edges of
+	// more cards peeking out under it, as if stacked: the hint that there's more.
+	let open = $state(false);
+
 	const streak = $derived(insights.streak);
+	const change = $derived(delta(insights.adherence, insights.prev_adherence));
 
-	// Average of the weeks that had something to resolve.
-	const resolved = $derived(insights.trend.filter((a): a is number => a !== null));
-	const avg = $derived(resolved.length ? resolved.reduce((a, b) => a + b, 0) / resolved.length : null);
-
-	// Sparkline: one point per week, gaps where a week had nothing resolved.
+	// Sparkline: one point per week, gaps where a week had nothing to count.
 	const W = 72;
 	const H = 18;
 	const points = $derived(
@@ -29,30 +32,48 @@
 	});
 	const last = $derived(points.at(-1));
 
-	const sessions = $derived(
-		insights.last_30.habits.filter((h) => h.plannable).reduce((n, h) => n + h.done, 0)
-	);
-	const days = $derived(insights.last_30.habits.filter((h) => !h.plannable));
+	function unit(n: number, u: 'sessions' | 'days'): string {
+		return n === 1 ? u.slice(0, -1) : u;
+	}
 </script>
 
-<section class="cards">
-	<div class="card">
-		<div class="muted small">Streak</div>
-		{#if streak}
-			<div class="v">
-				{streak.count}<span class="unit">{streak.count === 1 ? streak.unit.slice(0, -1) : streak.unit}</span>
-			</div>
-			<div class="sub">{streak.name}</div>
-		{:else}
-			<div class="v">0</div>
-			<div class="sub">None running</div>
-		{/if}
-	</div>
+{#snippet trend(d: number | null, prev: number | null)}
+	{#if d !== null}
+		<span
+			class="trend"
+			class:up={d > 0}
+			class:down={d < 0}
+			title="vs {pct(prev)} the 8 weeks before"
+			aria-label="{d > 0 ? 'up' : d < 0 ? 'down' : 'level'} {Math.abs(d)} points on the 8 weeks before"
+			><span aria-hidden="true">{d > 0 ? '▲' : d < 0 ? '▼' : '='}</span>{d === 0 ? '' : Math.abs(d)}</span
+		>
+	{/if}
+{/snippet}
 
-	{#if avg !== null}
-		<div class="card">
-			<div class="muted small">8 weeks</div>
-			<div class="v">{pct(avg)}<span class="unit">avg</span></div>
+<button
+	type="button"
+	class="cards"
+	class:open
+	aria-expanded={open}
+	aria-controls="habit-insights"
+	aria-label="{open ? 'Hide' : 'Show'} streaks and adherence by habit"
+	onclick={() => (open = !open)}
+>
+	<span class="card">
+		<span class="muted small">Longest streak</span>
+		{#if streak}
+			<span class="v">{streak.count}<span class="unit">{unit(streak.count, streak.unit)}</span></span>
+			<span class="sub">{streak.name}</span>
+		{:else}
+			<span class="v">0</span>
+			<span class="sub">None running</span>
+		{/if}
+	</span>
+
+	{#if insights.adherence !== null}
+		<span class="card">
+			<span class="muted small">8 weeks</span>
+			<span class="v">{pct(insights.adherence)}{@render trend(change, insights.prev_adherence)}</span>
 			<svg
 				class="spark"
 				viewBox="0 0 {W} {H}"
@@ -71,14 +92,27 @@
 				{/each}
 				{#if last}<circle class="now" cx={last.x} cy={last.y} r="2.5" />{/if}
 			</svg>
-		</div>
+		</span>
 	{/if}
+</button>
 
-	<div class="card">
-		<div class="muted small">Last 30 days</div>
-		<div class="v">{sessions}<span class="unit">{sessions === 1 ? 'session' : 'sessions'}</span></div>
-		<div class="sub">
-			{days.map((h) => `${h.name} ${h.done} ${h.done === 1 ? 'day' : 'days'}`).join(' · ') || ' '}
-		</div>
-	</div>
-</section>
+{#if open}
+	<table id="habit-insights" class="habit-insights" transition:slide={{ duration: motion(220) }}>
+		<thead>
+			<tr>
+				<th scope="col">Habit</th>
+				<th scope="col">Streak</th>
+				<th scope="col">8 weeks</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each insights.habits as h (h.key)}
+				<tr>
+					<th scope="row">{h.name}</th>
+					<td>{h.streak ? `${h.streak} ${unit(h.streak, h.unit)}` : '0'}</td>
+					<td>{pct(h.adherence)}{@render trend(delta(h.adherence, h.prev_adherence), h.prev_adherence)}</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+{/if}

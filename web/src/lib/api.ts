@@ -43,16 +43,29 @@ export interface Streak {
 	unit: 'sessions' | 'days';
 }
 
+export interface HabitInsight {
+	key: string;
+	name: string;
+	plannable: boolean;
+	streak: number;
+	unit: 'sessions' | 'days';
+	adherence: number | null;
+	prev_adherence: number | null;
+}
+
+/**
+ * Adherence here covers every habit: a plannable habit's sessions done or missed, any other habit's
+ * days since it was first done.
+ */
 export interface Insights {
 	as_of: string;
 	streak: Streak | null;
-	/** Adherence of the last 8 weeks, oldest first (the last is this week); null = nothing resolved. */
+	/** Adherence of the last 8 weeks, oldest first (the last is this week); null = nothing to count. */
 	trend: (number | null)[];
-	last_30: {
-		from: string;
-		to: string;
-		habits: { key: string; name: string; plannable: boolean; done: number }[];
-	};
+	/** Over the last 8 weeks up to as_of, and the 8 weeks before. */
+	adherence: number | null;
+	prev_adherence: number | null;
+	habits: HabitInsight[];
 }
 
 export interface Week {
