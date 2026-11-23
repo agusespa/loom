@@ -44,33 +44,35 @@
 			</div>
 			<div class="sub">{streak.name}</div>
 		{:else}
-			<div class="v">–</div>
+			<div class="v">0</div>
 			<div class="sub">None running</div>
 		{/if}
 	</div>
 
-	<div class="card">
-		<div class="muted small">8 weeks</div>
-		<div class="v">{pct(avg)}<span class="unit">avg</span></div>
-		<svg
-			class="spark"
-			viewBox="0 0 {W} {H}"
-			width={W}
-			height={H}
-			role="img"
-			aria-label="Adherence over the last 8 weeks"
-		>
-			<line x1="0" x2={W} y1={H / 2} y2={H / 2} class="mid" />
-			{#each segments as seg, i (i)}
-				{#if seg.length > 1}
-					<polyline points={seg.map((p) => `${p.x},${p.y}`).join(' ')} />
-				{:else}
-					<circle cx={seg[0].x} cy={seg[0].y} r="1.5" />
-				{/if}
-			{/each}
-			{#if last}<circle class="now" cx={last.x} cy={last.y} r="2.5" />{/if}
-		</svg>
-	</div>
+	{#if avg !== null}
+		<div class="card">
+			<div class="muted small">8 weeks</div>
+			<div class="v">{pct(avg)}<span class="unit">avg</span></div>
+			<svg
+				class="spark"
+				viewBox="0 0 {W} {H}"
+				width={W}
+				height={H}
+				role="img"
+				aria-label="Adherence over the last 8 weeks"
+			>
+				<line x1="0" x2={W} y1={H / 2} y2={H / 2} class="mid" />
+				{#each segments as seg, i (i)}
+					{#if seg.length > 1}
+						<polyline points={seg.map((p) => `${p.x},${p.y}`).join(' ')} />
+					{:else}
+						<circle cx={seg[0].x} cy={seg[0].y} r="1.5" />
+					{/if}
+				{/each}
+				{#if last}<circle class="now" cx={last.x} cy={last.y} r="2.5" />{/if}
+			</svg>
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="muted small">Last 30 days</div>
