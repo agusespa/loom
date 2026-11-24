@@ -1,4 +1,4 @@
-<p align="center"> <img src="web/static/icon-192.png" alt="Loom icon: five coloured threads merging into one trunk, like a tree" width="128"> </p>
+<p align="center"> <img src="web/static/icon-192.png" alt="Loom icon: six coloured threads rising as antlers from a geometric reindeer head" width="128"> </p>
 
 # Loom
 
