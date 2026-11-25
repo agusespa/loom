@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<clipPath id="corners"><rect width="512" height="512" rx="112"/></clipPath>
+<g clip-path="url(#corners)"><svg width="512" height="512" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<!-- The app icon. Edit this, then run `npm run icons` to regenerate every size.
+     Draw a full square without rounded corners; the script rounds them where needed.
+     Keep the mark inside the maskable safe zone: a circle of radius 204 around the centre. -->
+<!-- A geometric reindeer head, its antlers six coloured threads rising from the weave.
+     The field is the app header's violet-to-pink band at the same 120° angle, a shade deeper so the pastel threads stand out. -->
+<defs>
+<linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="-46.8" y1="81.2" x2="558.8" y2="430.8"><stop stop-color="#5546e8"/><stop offset="1" stop-color="#e23a72"/></linearGradient>
+<linearGradient id="lav" gradientUnits="userSpaceOnUse" x1="0" y1="248.75" x2="0" y2="305"><stop stop-color="#c3b1f2"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+<linearGradient id="blue" gradientUnits="userSpaceOnUse" x1="0" y1="220.625" x2="0" y2="305"><stop stop-color="#85b7eb"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+<linearGradient id="green" gradientUnits="userSpaceOnUse" x1="0" y1="203.75" x2="0" y2="305"><stop stop-color="#5dcaa5"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+<linearGradient id="yellow" gradientUnits="userSpaceOnUse" x1="0" y1="203.75" x2="0" y2="305"><stop stop-color="#efd77a"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+<linearGradient id="orange" gradientUnits="userSpaceOnUse" x1="0" y1="220.625" x2="0" y2="305"><stop stop-color="#f0b25c"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+<linearGradient id="pink" gradientUnits="userSpaceOnUse" x1="0" y1="248.75" x2="0" y2="305"><stop stop-color="#f2a3a3"/><stop offset="1" stop-color="#f6f5f1"/></linearGradient>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<g stroke-width="22" stroke-linecap="round" fill="none">
+<path d="M80 180 C80 252.5 231 260 231 305" stroke="url(#lav)"/>
+<path d="M125 117.5 C125 226.25 237 237.5 237 305" stroke="url(#blue)"/>
+<path d="M178 80 C178 210.5 243 224 243 305" stroke="url(#green)"/>
+<path d="M334 80 C334 210.5 269 224 269 305" stroke="url(#yellow)"/>
+<path d="M387 117.5 C387 226.25 275 237.5 275 305" stroke="url(#orange)"/>
+<path d="M432 180 C432 252.5 281 260 281 305" stroke="url(#pink)"/>
+</g>
+<polygon points="215,300 297,300 303,325 273,415 239,415 209,325" fill="#f6f5f1" stroke="#f6f5f1" stroke-width="18" stroke-linejoin="round"/>
+</svg></g>
+</svg>

@@ -47,9 +47,9 @@ e2e:
 	npx playwright install chromium
 	npm run test:e2e
 
-# Redraw the PNG icons in web/static.
+# Render the app icons from scripts/icon.svg into web/static/icons.
 icons:
-	go run ./scripts/icons
+	npm run icons
 
 docker:
 	docker buildx build --platform $(PLATFORMS) -t $(IMAGE) .
