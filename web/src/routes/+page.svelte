@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { version } from '$app/env';
+	import { replaceState } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { fetchWeek, putDay, type Status, type Week } from '#lib/api.ts';
 	import { addDays, ago, delta, fmt, isoWeek, pct } from '#lib/dates.ts';
@@ -44,13 +45,30 @@
 	// in flight, and an older answer arriving last mustn't overwrite the week you're on.
 	let loads = 0;
 
+	// This week as last loaded, shown at launch while load() asks the server for the latest.
+	const SAVED = 'loom:week';
+	function restore() {
+		try {
+			const saved = JSON.parse(localStorage.getItem(SAVED) ?? 'null') as Week | null;
+			if (!saved || week) return;
+			latestStart = saved.start;
+			week = saved;
+			loading = false;
+		} catch {
+			localStorage.removeItem(SAVED);
+		}
+	}
+
 	async function load() {
 		const n = ++loads;
 		const res = await fetchWeek(current);
 		if (n !== loads) return;
 		loading = false;
 		if (res.kind === 'ok') {
-			if (current === null) latestStart = res.week.start;
+			if (current === null) {
+				latestStart = res.week.start;
+				localStorage.setItem(SAVED, JSON.stringify(res.week));
+			}
 			seen.set(res.week.start, res.week);
 			week = res.week;
 			banner = null;
@@ -115,6 +133,9 @@
 	}
 
 	onMount(() => {
+		// Back from the Access login: drop the marker that let the launch skip the cached shell.
+		if (location.search === '?signin') replaceState('/', {});
+		restore();
 		load();
 		const onVisible = () => document.visibilityState === 'visible' && load();
 		document.addEventListener('visibilitychange', onVisible);
@@ -189,7 +210,7 @@
 			{#if banner === 'offline'}
 				Couldn't reach Loom. Check your connection.
 			{:else if banner === 'expired'}
-				Your session expired. <a href="/" onclick={() => location.reload()}>Sign in again</a>
+				Your session expired. <a href="/?signin">Sign in again</a>
 			{:else}
 				Couldn't load this week (HTTP {banner.status}).
 			{/if}

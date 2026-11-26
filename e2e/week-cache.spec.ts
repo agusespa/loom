@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// These hold API answers with page.route, which WebKit skips for pages a service worker controls.
+test.use({ serviceWorkers: "block" });
+
 const label = (page: Page) => page.locator(".week-label");
 const prev = (page: Page) =>
   page.getByRole("button", { name: "Previous week" });
