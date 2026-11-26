@@ -1,4 +1,4 @@
-<p align="center"> <img src="web/static/icons/icon-192-e155ee313f7a.png" alt="Loom icon: six coloured threads rising as antlers from a geometric reindeer head" width="128"> </p>
+<p align="center"> <img src="web/static/icons/icon-192-76e5359a3105.png" alt="Loom icon: six coloured threads rising as antlers from a geometric reindeer head" width="128"> </p>
 
 # Loom
 
